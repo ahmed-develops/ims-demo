@@ -1,0 +1,7 @@
+{
+  "name": "Boutique POS",
+  "description": "A modern, AI-powered Point of Sale application for boutique stores featuring smart inventory management, seamless billing, and an AI fashion assistant for styling advice and product inquiries.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
