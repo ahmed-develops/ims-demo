@@ -1,7 +1,7 @@
 
 import React, { useMemo, useState } from 'react';
 import { Transaction, TransactionType, Product, StockMovement, StockMovementType } from '../../types';
-import { TrendingUp, Download, Printer, Box, ShoppingBag, Truck, Activity, PieChart, ArrowUpRight, ArrowDownLeft, Search, Filter } from 'lucide-react';
+import { TrendingUp, Download, Printer, Box, ShoppingBag, Truck, Activity, PieChart, ArrowUpRight, ArrowDownLeft, Search, Filter, Globe } from 'lucide-react';
 
 interface ReportsDashboardProps {
   transactions: Transaction[];
@@ -27,6 +27,11 @@ const ReportsDashboard: React.FC<ReportsDashboardProps> = ({ transactions, produ
     const totalRevenue = filteredTxns.reduce((acc, t) => acc + t.total, 0);
     const totalTransactions = filteredTxns.length;
     
+    // Shopify Specific Stats
+    const shopifyTxns = filteredTxns.filter(t => t.type === TransactionType.Shopify);
+    const shopifyRevenue = shopifyTxns.reduce((acc, t) => acc + t.total, 0);
+    const shopifyCount = shopifyTxns.length;
+
     let totalStoreStock = 0;
     let totalWhStock = 0;
     products.forEach(p => {
@@ -51,7 +56,9 @@ const ReportsDashboard: React.FC<ReportsDashboardProps> = ({ transactions, produ
         totalStoreStock, 
         totalWhStock, 
         availableUnits,
-        soldRatio 
+        soldRatio,
+        shopifyRevenue,
+        shopifyCount
     };
   }, [transactions, products, startDate, endDate]);
 
@@ -70,6 +77,8 @@ const ReportsDashboard: React.FC<ReportsDashboardProps> = ({ transactions, produ
         ['Date Range', `${startDate} to ${endDate}`],
         ['Total Revenue', `Rs. ${stats.totalRevenue}`],
         ['Total Transactions', stats.totalTransactions.toString()],
+        ['Shopify Revenue', `Rs. ${stats.shopifyRevenue}`],
+        ['Shopify Order Count', stats.shopifyCount.toString()],
         ['Items Sold (In Range)', stats.soldUnits.toString()],
         ['Current Store Stock', stats.totalStoreStock.toString()],
         ['Current Warehouse Stock', stats.totalWhStock.toString()],
@@ -106,8 +115,8 @@ const ReportsDashboard: React.FC<ReportsDashboardProps> = ({ transactions, produ
             <p style="font-size: 32px; font-weight: 900; margin: 0;">₨ ${stats.totalRevenue.toLocaleString()}</p>
           </div>
           <div style="background: #f8fafc; padding: 25px; border-radius: 15px; border: 1px solid #e2e8f0;">
-            <p style="font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase; margin-bottom: 5px;">Settled Transactions</p>
-            <p style="font-size: 32px; font-weight: 900; margin: 0;">${stats.totalTransactions}</p>
+            <p style="font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase; margin-bottom: 5px;">Shopify E-Comm Sales</p>
+            <p style="font-size: 32px; font-weight: 900; margin: 0;">₨ ${stats.shopifyRevenue.toLocaleString()}</p>
           </div>
           <div style="background: #f8fafc; padding: 25px; border-radius: 15px; border: 1px solid #e2e8f0;">
             <p style="font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase; margin-bottom: 5px;">Store Floor Assets</p>
@@ -177,16 +186,11 @@ const ReportsDashboard: React.FC<ReportsDashboardProps> = ({ transactions, produ
                 <p className="text-[9px] font-bold mt-4 opacity-70">Through {stats.totalTransactions} Settled Trans</p>
             </div>
 
-            <div className="bg-white dark:bg-gray-900 p-8 rounded-[2.5rem] border border-gray-100 dark:border-gray-800 shadow-sm relative overflow-hidden group">
-                <ShoppingBag className="absolute -right-4 -bottom-4 w-32 h-32 text-indigo-50 dark:text-indigo-900/10 opacity-40 group-hover:scale-110 transition-transform duration-500" />
-                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Items Sold</p>
-                <div className="text-4xl font-black dark:text-white tracking-tighter leading-none">{stats.soldUnits} <span className="text-xs uppercase font-black text-gray-300">Units</span></div>
-                <div className="mt-4 flex items-center gap-2">
-                    <div className="flex-1 h-1.5 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
-                        <div className="h-full bg-emerald-500 transition-all duration-1000" style={{ width: `${stats.soldRatio}%` }}></div>
-                    </div>
-                    <span className="text-[10px] font-black text-emerald-500">{stats.soldRatio.toFixed(1)}%</span>
-                </div>
+            <div className="bg-white dark:bg-gray-900 p-8 rounded-[2.5rem] border border-gray-100 dark:border-gray-800 shadow-sm relative overflow-hidden group transition-all hover:border-blue-500/20">
+                <Globe className="absolute -right-4 -bottom-4 w-32 h-32 text-blue-50 dark:text-blue-900/10 opacity-40 group-hover:scale-110 transition-transform duration-500" />
+                <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-2">Shopify Volume</p>
+                <div className="text-4xl font-black dark:text-white tracking-tighter leading-none">₨ {stats.shopifyRevenue.toLocaleString()}</div>
+                <p className="text-[9px] font-bold text-gray-400 mt-4 uppercase">From {stats.shopifyCount} Web Orders</p>
             </div>
 
             <div className="bg-white dark:bg-gray-900 p-8 rounded-[2.5rem] border border-gray-100 dark:border-gray-800 shadow-sm group transition-all hover:border-indigo-500/20">
@@ -255,57 +259,6 @@ const ReportsDashboard: React.FC<ReportsDashboardProps> = ({ transactions, produ
                     </div>
                 </div>
             </div>
-
-            {/* Live Movement Pulse Disabled (Commented Out for Future Re-enablement)
-            <div className="lg:col-span-4 flex flex-col h-full">
-                <div className="bg-white dark:bg-gray-900 rounded-[2.5rem] flex-1 border border-gray-100 dark:border-gray-800 shadow-sm flex flex-col overflow-hidden">
-                    <div className="p-8 border-b border-gray-50 dark:border-gray-800">
-                        <div className="flex items-center gap-3 mb-6">
-                            <Activity className="text-emerald-500 animate-pulse" size={20} />
-                            <h3 className="text-sm font-black dark:text-white uppercase tracking-widest">Movement Log</h3>
-                        </div>
-                        <div className="relative">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300" size={14} />
-                            <input 
-                                value={pulseSearch}
-                                onChange={e => setPulseSearch(e.target.value)}
-                                placeholder="Search Movement History..."
-                                className="w-full pl-9 pr-4 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl text-[10px] font-black uppercase outline-none focus:ring-2 focus:ring-indigo-500"
-                            />
-                        </div>
-                    </div>
-                    
-                    <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                        {recentMovements.length > 0 ? recentMovements.map((m, idx) => (
-                            <div key={idx} className="flex items-center gap-4 p-4 bg-gray-50/50 dark:bg-gray-800/30 rounded-2xl border border-transparent hover:border-gray-100 dark:hover:border-gray-700 transition-all">
-                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${m.quantityChange > 0 ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600' : 'bg-red-50 dark:bg-red-900/20 text-red-600'}`}>
-                                    {m.quantityChange > 0 ? <ArrowUpRight size={18} /> : <ArrowDownLeft size={18} />}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <p className="text-[10px] font-black dark:text-white uppercase truncate">{m.productName}</p>
-                                    <div className="flex items-center gap-2 mt-1">
-                                        <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded ${m.location === 'Store' ? 'bg-blue-50 text-blue-600' : 'bg-purple-50 text-purple-600'}`}>{m.location}</span>
-                                        <span className="text-[9px] font-bold text-gray-400">{Math.abs(m.quantityChange)} Units</span>
-                                    </div>
-                                </div>
-                                <div className="text-right">
-                                    <p className="text-[8px] font-black text-gray-300 uppercase">{new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
-                                </div>
-                            </div>
-                        )) : (
-                            <div className="h-full flex flex-col items-center justify-center text-gray-300 p-10 opacity-30">
-                                <Box size={40} className="mb-4" />
-                                <p className="text-[10px] font-black uppercase">No Recent Activity</p>
-                            </div>
-                        )}
-                    </div>
-
-                    <div className="p-6 bg-gray-50 dark:bg-gray-800/50 border-t border-gray-100 dark:border-gray-700">
-                        <p className="text-[8px] font-black text-gray-400 text-center uppercase tracking-widest">Real-time Logistics Sync Active</p>
-                    </div>
-                </div>
-            </div>
-            */}
         </div>
       </div>
     </div>
