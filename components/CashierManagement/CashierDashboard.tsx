@@ -3,6 +3,7 @@ import React, { useMemo, useState } from 'react';
 import { ShiftRecord, CashierUser, UserRole } from '../../types';
 import { User, Calendar, Clock, Banknote, CreditCard, Filter, RefreshCcw, Search, Users, TrendingUp, Plus, Pencil, Trash2, ShieldCheck, UserCheck, AlertTriangle } from 'lucide-react';
 import UserModal from './UserModal';
+import ConfirmationModal from '../UI/ConfirmationModal';
 
 interface CashierDashboardProps {
   shiftHistory: ShiftRecord[];
@@ -379,28 +380,15 @@ const CashierDashboard: React.FC<CashierDashboardProps> = ({ shiftHistory, users
         user={editingUser}
       />
 
-      {userToDelete && (
-          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200">
-              <div className="bg-white dark:bg-gray-800 rounded-[2.5rem] shadow-2xl max-w-sm w-full p-8 animate-in zoom-in-95 duration-200 border border-gray-100 dark:border-gray-700">
-                  <div className="flex items-center gap-4 text-red-600 mb-6">
-                      <div className="p-3 bg-red-50 rounded-2xl">
-                          <AlertTriangle size={32} />
-                      </div>
-                      <div>
-                        <h3 className="text-xl font-black text-gray-900 dark:text-white uppercase tracking-tight">Revoke Access?</h3>
-                        <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1">Confirm Identity Deletion</p>
-                      </div>
-                  </div>
-                  <p className="text-gray-600 dark:text-gray-300 text-sm mb-8 leading-relaxed">
-                      Are you sure you want to remove <span className="font-black text-gray-900 dark:text-white">"${userToDelete.fullName}"</span>? This will immediately disable their store access.
-                  </p>
-                  <div className="flex gap-3">
-                      <button onClick={() => setUserToDelete(null)} className="flex-1 py-3 bg-gray-50 dark:bg-gray-700 text-gray-500 dark:text-gray-200 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-gray-100 transition-colors">Abort</button>
-                      <button onClick={confirmDelete} className="flex-1 py-3 bg-red-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-red-700 transition-colors shadow-lg shadow-red-200">Confirm</button>
-                  </div>
-              </div>
-          </div>
-      )}
+      <ConfirmationModal
+        isOpen={!!userToDelete}
+        onClose={() => setUserToDelete(null)}
+        onConfirm={confirmDelete}
+        title="Revoke Access?"
+        message={`Are you sure you want to remove "${userToDelete?.fullName}"? This will immediately disable their store access.`}
+        confirmText="Confirm"
+        type="danger"
+      />
     </div>
   );
 };

@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { Plus, Trash2, Layers, Search, Info } from 'lucide-react';
 import { Product } from '../../types';
+import ConfirmationModal from '../UI/ConfirmationModal';
 
 interface CollectionsViewProps {
   collections: string[];
@@ -13,6 +14,7 @@ interface CollectionsViewProps {
 const CollectionsView: React.FC<CollectionsViewProps> = ({ collections = [], products = [], onAddCollection, onDeleteCollection }) => {
   const [newCollection, setNewCollection] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [collectionToDelete, setCollectionToDelete] = useState<string | null>(null);
 
   const handleAddColl = (e: React.FormEvent) => {
     e.preventDefault();
@@ -86,7 +88,7 @@ const CollectionsView: React.FC<CollectionsViewProps> = ({ collections = [], pro
                             </div>
                         </div>
                         <button 
-                            onClick={() => { if(confirm(`Delete collection "${coll}"?`)) onDeleteCollection(coll); }} 
+                            onClick={() => setCollectionToDelete(coll)} 
                             className="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all opacity-0 group-hover:opacity-100"
                         >
                             <Trash2 size={16} />
@@ -103,6 +105,16 @@ const CollectionsView: React.FC<CollectionsViewProps> = ({ collections = [], pro
             </div>
         )}
       </div>
+
+      <ConfirmationModal
+        isOpen={!!collectionToDelete}
+        onClose={() => setCollectionToDelete(null)}
+        onConfirm={() => collectionToDelete && onDeleteCollection(collectionToDelete)}
+        title="Remove Collection?"
+        message={`Are you sure you want to delete "${collectionToDelete}"? All items in this collection will become uncategorized.`}
+        confirmText="Remove"
+        type="danger"
+      />
     </div>
   );
 };

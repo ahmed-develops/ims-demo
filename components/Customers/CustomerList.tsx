@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { Customer, Transaction, UserRole } from '../../types';
 import { Search, Plus, Pencil, Trash2, Users, AlertTriangle, Award, DollarSign, History, ChevronRight } from 'lucide-react';
 import CustomerModal from './CustomerModal';
+import ConfirmationModal from '../UI/ConfirmationModal';
 
 interface CustomerListProps {
   customers: Customer[];
@@ -51,6 +52,13 @@ const CustomerList: React.FC<CustomerListProps> = ({
       onEditCustomer(customer);
     } else {
       onAddCustomer(customer);
+    }
+  };
+
+  const confirmDelete = () => {
+    if (customerToDelete) {
+      onDeleteCustomer(customerToDelete.id);
+      setCustomerToDelete(null);
     }
   };
 
@@ -158,6 +166,16 @@ const CustomerList: React.FC<CustomerListProps> = ({
         </div>
 
         <CustomerModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onSave={handleSaveCustomer} customer={editingCustomer} />
+
+        <ConfirmationModal
+          isOpen={!!customerToDelete}
+          onClose={() => setCustomerToDelete(null)}
+          onConfirm={confirmDelete}
+          title="Delete Customer?"
+          message={`Are you sure you want to remove "${customerToDelete?.name}"? All loyalty data will be lost permanently.`}
+          confirmText="Delete"
+          type="danger"
+        />
 
         {/* Customer History Sidebar/Modal Overlay */}
         {viewingHistory && (

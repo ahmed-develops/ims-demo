@@ -22,6 +22,7 @@ import StartShift from './components/Shift/StartShift';
 import EndShiftModal from './components/Shift/EndShiftModal';
 import AuditLogsView from './components/Admin/AuditLogsView';
 import BackupExportView from './components/Admin/BackupExportView';
+import ConfirmationModal from './components/UI/ConfirmationModal';
 import { ViewState, Product, ProductSize, CartItem, Transaction, Customer, SessionInfo, Collection, ShiftRecord, CashierUser, UserRole, TransactionType, AuditLog, StockMovement, StockMovementType } from './types';
 import { PRODUCTS, SHIFT_HISTORY, USERS } from './constants';
 import { getShiftDetails } from './utils';
@@ -55,6 +56,9 @@ const App: React.FC = () => {
   const [lowStockThreshold, setLowStockThreshold] = useState(30);
   const [pendingCheckout, setPendingCheckout] = useState<{ amountPaid: number; balance: number; isPartial: boolean; cashReceived: number; changeAmount: number } | null>(null);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+
+  // Confirmation Modal States
+  const [returnTxnPending, setReturnTxnPending] = useState<Transaction | null>(null);
 
   useEffect(() => {
     if (isDarkMode) document.documentElement.classList.add('dark');
@@ -252,8 +256,9 @@ const App: React.FC = () => {
     setPendingCheckout(null);
   };
 
-  const handleProcessReturn = (txn: Transaction) => {
-    if (!confirm(`Confirm Return/Exchange for Transaction #${txn.id}?`)) return;
+  const finalizeProcessReturn = () => {
+    const txn = returnTxnPending;
+    if (!txn) return;
 
     setProducts(prev => prev.map(p => {
         const updatedSizes = p.sizes.map(s => {
@@ -281,6 +286,7 @@ const App: React.FC = () => {
 
     setTransactions(prev => [returnTxn, ...prev]);
     addAuditLog('Return', `Transaction #${txn.id} was returned.`);
+    setReturnTxnPending(null);
   };
 
   const handleCheckoutInit = (details: { amountPaid: number; balance: number; isPartial: boolean; cashReceived: number; changeAmount: number }) => {
@@ -402,7 +408,7 @@ const App: React.FC = () => {
       case ViewState.StockReport:
         return <StockReport products={products} collections={collections} movements={stockMovements} userRole={currentUserRole} />;
       case ViewState.Transactions:
-        return <TransactionList transactions={transactions} onViewReceipt={setLastTransaction} onReturn={canPerformReturn ? handleProcessReturn : undefined} />;
+        return <TransactionList transactions={transactions} onViewReceipt={setLastTransaction} onReturn={canPerformReturn ? setReturnTxnPending : undefined} />;
       case ViewState.Customers:
         return <CustomerList customers={customers} onAddCustomer={c => setCustomers([...customers, c])} onEditCustomer={c => setCustomers(customers.map(x => x.id === c.id ? c : x))} onDeleteCustomer={id => setCustomers(customers.filter(x => x.id !== id))} transactions={transactions} userRole={currentUserRole} />;
       case ViewState.Reports:
@@ -441,6 +447,15 @@ const App: React.FC = () => {
       <PaymentModal isOpen={isPaymentModalOpen} total={pendingCheckout?.amountPaid || 0} onClose={() => setIsPaymentModalOpen(false)} onConfirm={handlePaymentConfirm} />
       <ReceiptModal transaction={lastTransaction} onClose={() => setLastTransaction(null)} />
       <DistributionReceiptModal transaction={lastDistribution} onClose={() => setLastDistribution(null)} />
+      <ConfirmationModal
+        isOpen={!!returnTxnPending}
+        onClose={() => setReturnTxnPending(null)}
+        onConfirm={finalizeProcessReturn}
+        title="Process Return?"
+        message={`Confirm Return/Exchange for Transaction #${returnTxnPending?.id}? This will reverse the sale and restock the items.`}
+        confirmText="Confirm Return"
+        type="warning"
+      />
       {sessionInfo && <EndShiftModal isOpen={showEndShiftModal} onClose={() => setShowEndShiftModal(false)} onConfirmEndShift={confirmEndShift} sessionInfo={sessionInfo} transactions={transactions} />}
     </>
   );
