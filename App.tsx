@@ -5,6 +5,7 @@ import ProductGrid from './components/POS/ProductGrid';
 import Cart from './components/POS/Cart';
 import PaymentModal from './components/POS/PaymentModal';
 import ReceiptModal from './components/POS/ReceiptModal';
+import DistributionReceiptModal from './components/Inventory/DistributionReceiptModal';
 import InventoryList from './components/Inventory/InventoryList';
 import InventoryOut from './components/Inventory/InventoryOut';
 import StockReport from './components/Reports/StockReport';
@@ -13,7 +14,6 @@ import BarcodeDirectory from './components/Inventory/BarcodeDirectory';
 import CustomerList from './components/Customers/CustomerList';
 import TransactionList from './components/Transactions/TransactionList';
 import CollectionsView from './components/Settings/CollectionsView';
-import BrandsView from './components/Settings/BrandsView';
 import CashierDashboard from './components/CashierManagement/CashierDashboard';
 import ReportsDashboard from './components/Reports/ReportsDashboard';
 import AIAssistant from './components/AIAssistant';
@@ -25,7 +25,7 @@ import BackupExportView from './components/Admin/BackupExportView';
 import { ViewState, Product, ProductSize, CartItem, Transaction, Customer, SessionInfo, Collection, ShiftRecord, CashierUser, UserRole, TransactionType, AuditLog, StockMovement, StockMovementType } from './types';
 import { PRODUCTS, SHIFT_HISTORY, USERS } from './constants';
 import { getShiftDetails } from './utils';
-import { LayoutDashboard, ShoppingCart, Archive, Users, Layers, Tags, Briefcase, TrendingUp, Truck, FileText, ClipboardList, Database, Barcode, History, Eye } from 'lucide-react';
+import { LayoutDashboard, ShoppingCart, Archive, Users, Layers, TrendingUp, Truck, FileText, ClipboardList, Database, Barcode, History, RotateCcw } from 'lucide-react';
 
 const App: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -41,20 +41,19 @@ const App: React.FC = () => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [stockMovements, setStockMovements] = useState<StockMovement[]>([]);
   const [shiftHistory, setShiftHistory] = useState<ShiftRecord[]>(SHIFT_HISTORY);
-  // Custom collection and brand setup
   const [collections, setCollections] = useState<string[]>([
     Collection.WinterEditII,
     Collection.WinterFormals,
     Collection.LawnVol2_2025
   ]);
-  const [brands, setBrands] = useState<string[]>(['NiaMia']);
   const [orderDiscount, setOrderDiscount] = useState<number>(0);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [showEndShiftModal, setShowEndShiftModal] = useState(false);
   const [lastTransaction, setLastTransaction] = useState<Transaction | null>(null);
+  const [lastDistribution, setLastDistribution] = useState<Transaction | null>(null);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [lowStockThreshold, setLowStockThreshold] = useState(30);
-  const [pendingCheckout, setPendingCheckout] = useState<{ amountPaid: number; balance: number; isPartial: boolean } | null>(null);
+  const [pendingCheckout, setPendingCheckout] = useState<{ amountPaid: number; balance: number; isPartial: boolean; cashReceived: number; changeAmount: number } | null>(null);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
 
   useEffect(() => {
@@ -102,46 +101,45 @@ const App: React.FC = () => {
     setStockMovements(prev => [movement, ...prev]);
   }, [currentUser]);
 
-  const adminNavItems: NavItem[] = [
-    { id: ViewState.Reports, label: 'Analytics', icon: TrendingUp },
-    { id: ViewState.Inventory, label: 'Stock In', icon: Archive },
-    { id: ViewState.InventoryOut, label: 'Stock OUT', icon: Truck },
-    { id: ViewState.StockTrack, label: 'Stock Track', icon: History },
-    { id: ViewState.Barcodes, label: 'Barcodes', icon: Barcode },
-    { id: ViewState.StockReport, label: 'Stock Reports', icon: FileText },
-    { id: ViewState.Customers, label: 'Customers', icon: Users },
-    { id: ViewState.Collections, label: 'Collections', icon: Layers },
-    { id: ViewState.Brands, label: 'Brands', icon: Tags },
-    { id: ViewState.CashierManagement, label: 'Staff Mgmt', icon: Briefcase },
-    { id: ViewState.Transactions, label: 'Transactions', icon: LayoutDashboard },
-    { id: ViewState.AuditLogs, label: 'Audit Logs', icon: ClipboardList },
-    { id: ViewState.Backup, label: 'Backup & Data', icon: Database },
-  ];
-
-  const cashierNavItems: NavItem[] = [
-    { id: ViewState.POS, label: 'Point of Sale', icon: ShoppingCart },
-    { id: ViewState.Transactions, label: 'Transactions', icon: LayoutDashboard },
-    { id: ViewState.Customers, label: 'Customers', icon: Users },
-  ];
-
-  const warehouseNavItems: NavItem[] = [
-      { id: ViewState.Inventory, label: 'Inventory (Stock In)', icon: Archive },
-      { id: ViewState.InventoryOut, label: 'Inventory OUT', icon: Truck },
-      { id: ViewState.StockTrack, label: 'Stock Track', icon: History },
-      { id: ViewState.Barcodes, label: 'Barcodes', icon: Barcode },
-      { id: ViewState.StockReport, label: 'Stock Report', icon: FileText },
-  ];
-
-  const viewerNavItems: NavItem[] = [
-    { id: ViewState.Reports, label: 'Analytics', icon: TrendingUp },
-    { id: ViewState.StockReport, label: 'Stock Reports', icon: FileText },
-    { id: ViewState.Barcodes, label: 'Barcodes', icon: Barcode },
-    { id: ViewState.Transactions, label: 'Transactions', icon: LayoutDashboard },
-    { id: ViewState.AuditLogs, label: 'Audit Logs', icon: ClipboardList },
-    { id: ViewState.CashierManagement, label: 'Staff Review', icon: Briefcase },
-  ];
-
   const getNavItems = () => {
+    const adminNavItems: NavItem[] = [
+        { id: ViewState.Reports, label: 'Analytics', icon: TrendingUp },
+        { id: ViewState.Inventory, label: 'Stock In', icon: Archive },
+        { id: ViewState.InventoryOut, label: 'Stock OUT', icon: Truck },
+        { id: ViewState.StockTrack, label: 'Stock Track', icon: History },
+        { id: ViewState.Barcodes, label: 'Barcodes', icon: Barcode },
+        { id: ViewState.StockReport, label: 'Stock Reports', icon: FileText },
+        { id: ViewState.Customers, label: 'Customers', icon: Users },
+        { id: ViewState.Collections, label: 'Collections', icon: Layers },
+        { id: ViewState.CashierManagement, label: 'Staff Mgmt', icon: Users },
+        { id: ViewState.Transactions, label: 'Transactions', icon: LayoutDashboard },
+        { id: ViewState.AuditLogs, label: 'Audit Logs', icon: ClipboardList },
+        { id: ViewState.Backup, label: 'Backup & Data', icon: Database },
+      ];
+    
+      const cashierNavItems: NavItem[] = [
+        { id: ViewState.POS, label: 'Point of Sale', icon: ShoppingCart },
+        { id: ViewState.Transactions, label: 'Transactions', icon: LayoutDashboard },
+      ];
+    
+      const warehouseNavItems: NavItem[] = [
+          { id: ViewState.Inventory, label: 'Stock In', icon: Archive },
+          { id: ViewState.InventoryOut, label: 'Stock OUT', icon: Truck },
+          { id: ViewState.StockTrack, label: 'Stock Track', icon: History },
+          { id: ViewState.Barcodes, label: 'Barcodes', icon: Barcode },
+          { id: ViewState.StockReport, label: 'Stock Report', icon: FileText },
+          { id: ViewState.Collections, label: 'Collections', icon: Layers },
+      ];
+    
+      const viewerNavItems: NavItem[] = [
+        { id: ViewState.Reports, label: 'Analytics', icon: TrendingUp },
+        { id: ViewState.StockReport, label: 'Stock Reports', icon: FileText },
+        { id: ViewState.StockTrack, label: 'Stock Track', icon: History },
+        { id: ViewState.Transactions, label: 'Transactions', icon: LayoutDashboard },
+        { id: ViewState.Customers, label: 'Customers', icon: Users },
+        { id: ViewState.AuditLogs, label: 'Audit Logs', icon: ClipboardList },
+      ];
+
     switch(currentUserRole) {
         case 'Admin': return adminNavItems;
         case 'Cashier': return cashierNavItems;
@@ -235,6 +233,8 @@ const App: React.FC = () => {
       amountPaid: pendingCheckout.amountPaid,
       balance: pendingCheckout.balance,
       isPartial: pendingCheckout.isPartial,
+      cashReceived: pendingCheckout.cashReceived,
+      changeAmount: pendingCheckout.changeAmount,
       customer: selectedCustomer || undefined,
       shift: sessionInfo.shift,
       businessDate: sessionInfo.businessDate.toISOString().split('T')[0],
@@ -243,7 +243,7 @@ const App: React.FC = () => {
     };
 
     setTransactions(prev => [txn, ...prev]);
-    addAuditLog('Sale', `New transaction ${txn.id} completed. Amount: ₨ ${total}`);
+    addAuditLog('Sale', `Transaction ${txn.id} completed. Amount: ₨ ${total}`);
     setLastTransaction(txn);
     setCart([]);
     setSelectedCustomer(null);
@@ -252,167 +252,38 @@ const App: React.FC = () => {
     setPendingCheckout(null);
   };
 
-  const renderContent = () => {
-    switch (currentView) {
-      case ViewState.POS:
-        return (
-          <div className="flex h-full">
-            <div className="flex-1 overflow-hidden relative">
-              <ProductGrid 
-                products={products} 
-                onAddToCart={addToCart} 
-                collections={collections} 
-                cart={cart} 
-              />
-            </div>
-            <div className="w-[400px] shrink-0 h-full shadow-2xl z-20">
-              <Cart
-                items={cart}
-                customers={customers}
-                selectedCustomer={selectedCustomer}
-                orderDiscount={orderDiscount}
-                setOrderDiscount={setOrderDiscount}
-                onSelectCustomer={setSelectedCustomer}
-                onAddCustomer={c => { setCustomers([...customers, c]); addAuditLog('Customer Created', `Added customer ${c.name}`); }}
-                onUpdateQuantity={updateQuantity}
-                onRemoveItem={(pid, sid) => setCart(prev => prev.filter(item => !(item.id === pid && item.selectedSize.sizeInternal === sid)))}
-                onCheckout={handleCheckoutInit}
-                onClearCart={() => { setCart([]); setOrderDiscount(0); }}
-              />
-            </div>
-          </div>
-        );
-      case ViewState.Inventory:
-        return <InventoryList 
-            products={products} 
-            onAddProduct={p => { 
-                setProducts([p, ...products]); 
-                addAuditLog('Product Added', `Created product ${p.name}`);
-                p.sizes.forEach(s => {
-                   if (s.stock > 0) logStockMovement(p.id, p.name, s.sizeInternal, StockMovementType.Inward, s.stock, s.stock, s.warehouseStock, 'Initial Store Stock');
-                   if (s.warehouseStock > 0) logStockMovement(p.id, p.name, s.sizeInternal, StockMovementType.Inward, s.warehouseStock, s.stock, s.warehouseStock, 'Initial Warehouse Stock');
-                });
-            }} 
-            onEditProduct={p => { 
-                const oldProduct = products.find(x => x.id === p.id);
-                if (oldProduct) {
-                    p.sizes.forEach((newSize, idx) => {
-                        const oldSize = oldProduct.sizes[idx];
-                        if (oldSize) {
-                            if (newSize.stock !== oldSize.stock) {
-                                logStockMovement(p.id, p.name, newSize.sizeInternal, StockMovementType.Adjustment, newSize.stock - oldSize.stock, newSize.stock, newSize.warehouseStock, 'Manual Store Adjustment');
-                            }
-                            if (newSize.warehouseStock !== oldSize.warehouseStock) {
-                                logStockMovement(p.id, p.name, newSize.sizeInternal, StockMovementType.Adjustment, newSize.warehouseStock - oldSize.warehouseStock, newSize.stock, newSize.warehouseStock, 'Manual Warehouse Adjustment');
-                            }
-                        }
-                    });
-                }
-                setProducts(products.map(x => x.id === p.id ? p : x)); 
-                addAuditLog('Product Edited', `Updated product ${p.name}`); 
-            }} 
-            onDeleteProduct={id => { setProducts(products.filter(x => x.id !== id)); addAuditLog('Product Deleted', `Deleted ID: ${id}`); }} 
-            lowStockThreshold={lowStockThreshold} 
-            onUpdateThreshold={setLowStockThreshold} 
-            collections={collections} 
-            brands={brands} 
-            currentUserRole={currentUserRole} 
-        />;
-      case ViewState.InventoryOut:
-        return <InventoryOut 
-            products={products} 
-            transactions={transactions}
-            onProcessOut={(type, items, details) => { 
-            setProducts(prev => prev.map(p => {
-                const update = items.find(i => i.productId === p.id);
-                if (update) {
-                    const updatedSizes = p.sizes.map(s => {
-                        if (s.sizeInternal === update.sizeInternal) {
-                            const newWhStock = Math.max(0, s.warehouseStock - update.quantity);
-                            const newStoreStock = type === TransactionType.Transfer 
-                                ? s.stock + update.quantity 
-                                : s.stock;
-                            
-                            logStockMovement(
-                              p.id, p.name, s.sizeInternal, 
-                              type === TransactionType.Transfer ? StockMovementType.Transfer : StockMovementType.Outward, 
-                              -update.quantity, 
-                              newStoreStock, 
-                              newWhStock, 
-                              `Inventory Out: ${type}`
-                            );
-                            
-                            return { ...s, warehouseStock: newWhStock, stock: newStoreStock };
-                        }
-                        return s;
-                    });
-                    return { ...p, sizes: updatedSizes };
-                }
-                return p;
-            }));
+  const handleProcessReturn = (txn: Transaction) => {
+    if (!confirm(`Confirm Return/Exchange for Transaction #${txn.id}?`)) return;
 
-            if (type !== TransactionType.Transfer) {
-                const item = products.find(p => p.id === items[0].productId);
-                if (item) {
-                   const variant = item.sizes.find(s => s.sizeInternal === items[0].sizeInternal);
-                   const basePrice = (variant?.price || item.price);
-                   const price = type === TransactionType.PR ? 0 : basePrice;
-                   const finalTotal = price * items[0].quantity * (1 - (details.discount || 0) / 100);
-                   
-                   const txn: Transaction = {
-                      id: `OUT-${Math.random().toString(36).substr(2, 5).toUpperCase()}`,
-                      date: new Date(),
-                      type,
-                      items: [{ ...item, selectedSize: variant!, quantity: items[0].quantity }],
-                      subtotal: basePrice * items[0].quantity,
-                      total: finalTotal,
-                      paymentMethod: 'N/A',
-                      amountPaid: finalTotal,
-                      balance: 0,
-                      isPartial: false,
-                      shift: 'Morning',
-                      businessDate: new Date().toISOString().split('T')[0],
-                      cashierName: currentUser,
-                      recipientName: details.recipient,
-                      externalOrderId: details.orderId,
-                      orderDiscount: details.discount
-                   };
-                   setTransactions(prev => [txn, ...prev]);
-                }
-            } else {
-                addAuditLog('Warehouse Transfer', `Moved ${items[0].quantity} unit(s) of ${items[0].productId} to Store.`);
+    setProducts(prev => prev.map(p => {
+        const updatedSizes = p.sizes.map(s => {
+            const returnedItem = txn.items.find(item => item.id === p.id && item.selectedSize.sizeInternal === s.sizeInternal);
+            if (returnedItem) {
+                const newStoreStock = s.stock + returnedItem.quantity;
+                logStockMovement(p.id, p.name, s.sizeInternal, StockMovementType.Return, returnedItem.quantity, newStoreStock, s.warehouseStock, `Return from Txn #${txn.id}`);
+                return { ...s, stock: newStoreStock };
             }
+            return s;
+        });
+        return { ...p, sizes: updatedSizes };
+    }));
 
-            addAuditLog('Inventory OUT', `Processed ${type}`);
-            alert(`${type} processed successfully.`);
-        }} />;
-      case ViewState.StockTrack:
-        return <StockTrackView movements={stockMovements} userRole={currentUserRole} />;
-      case ViewState.Barcodes:
-        return <BarcodeDirectory products={products} onUpdateProduct={p => { setProducts(products.map(x => x.id === p.id ? p : x)); addAuditLog('Inventory Update', `Updated article: ${p.id}`); }} collections={collections} brands={brands} userRole={currentUserRole} />;
-      case ViewState.StockReport:
-        return <StockReport products={products} collections={collections} />;
-      case ViewState.Transactions:
-        return <TransactionList transactions={transactions} onViewReceipt={setLastTransaction} />;
-      case ViewState.Customers:
-        return <CustomerList customers={customers} onAddCustomer={c => setCustomers([...customers, c])} onEditCustomer={c => setCustomers(customers.map(x => x.id === c.id ? c : x))} onDeleteCustomer={id => setCustomers(customers.filter(x => x.id !== id))} transactions={transactions} />;
-      case ViewState.Reports:
-        return <ReportsDashboard shiftHistory={shiftHistory} transactions={transactions} />;
-      case ViewState.CashierManagement:
-        return <CashierDashboard shiftHistory={shiftHistory} users={users} onAddUser={u => { setUsers([...users, u]); addAuditLog('User Added', `Created staff member ${u.fullName}`); }} onEditUser={u => { setUsers(users.map(x => x.id === u.id ? u : x)); addAuditLog('User Edited', `Updated staff member ${u.fullName}`); }} onDeleteUser={id => { setUsers(users.filter(x => x.id !== id)); addAuditLog('User Deleted', `Deleted staff member ID: ${id}`); }} currentUserRole={currentUserRole} />;
-      case ViewState.AuditLogs:
-        return <AuditLogsView logs={auditLogs} userRole={currentUserRole} />;
-      case ViewState.Backup:
-        return <BackupExportView data={{ products, transactions, customers, users, shiftHistory, stockMovements }} />;
-      case ViewState.Collections:
-        return <CollectionsView collections={collections} products={products} onAddCollection={c => setCollections([...collections, c])} onDeleteCollection={c => setCollections(collections.filter(x => x !== c))} />;
-      case ViewState.Brands:
-        return <BrandsView brands={brands} products={products} onAddBrand={b => setBrands([...brands, b])} onDeleteBrand={b => setBrands(brands.filter(x => x !== b))} />;
-      default: return null;
-    }
+    const returnTxn: Transaction = {
+        ...txn,
+        id: `RET-${Math.random().toString(36).substr(2, 5).toUpperCase()}`,
+        date: new Date(),
+        type: TransactionType.Return,
+        total: -txn.total,
+        amountPaid: -txn.amountPaid,
+        originalTransactionId: txn.id,
+        notes: `Customer return from #${txn.id}`
+    };
+
+    setTransactions(prev => [returnTxn, ...prev]);
+    addAuditLog('Return', `Transaction #${txn.id} was returned.`);
   };
 
-  const handleCheckoutInit = (details: { amountPaid: number; balance: number; isPartial: boolean }) => {
+  const handleCheckoutInit = (details: { amountPaid: number; balance: number; isPartial: boolean; cashReceived: number; changeAmount: number }) => {
     setPendingCheckout(details);
     setIsPaymentModalOpen(true);
   };
@@ -442,6 +313,112 @@ const App: React.FC = () => {
     });
   };
 
+  const renderContent = () => {
+    const canPerformReturn = currentUserRole === 'Admin' || currentUserRole === 'Cashier';
+
+    switch (currentView) {
+      case ViewState.POS:
+        return (
+          <div className="flex h-full">
+            <div className="flex-1 overflow-hidden relative">
+              <ProductGrid products={products} onAddToCart={addToCart} collections={collections} cart={cart} />
+            </div>
+            <div className="w-[400px] shrink-0 h-full shadow-2xl z-20">
+              <Cart
+                items={cart}
+                customers={customers}
+                selectedCustomer={selectedCustomer}
+                orderDiscount={orderDiscount}
+                setOrderDiscount={setOrderDiscount}
+                onSelectCustomer={setSelectedCustomer}
+                onAddCustomer={c => { setCustomers([...customers, c]); addAuditLog('Customer Created', `Added ${c.name}`); }}
+                onUpdateQuantity={updateQuantity}
+                onRemoveItem={(pid, sid) => setCart(prev => prev.filter(item => !(item.id === pid && item.selectedSize.sizeInternal === sid)))}
+                onCheckout={handleCheckoutInit}
+                onClearCart={() => { setCart([]); setOrderDiscount(0); }}
+              />
+            </div>
+          </div>
+        );
+      case ViewState.Inventory:
+        return <InventoryList products={products} onAddProduct={p => { setProducts([p, ...products]); addAuditLog('Product Added', p.id); }} onEditProduct={p => setProducts(products.map(x => x.id === p.id ? p : x))} onDeleteProduct={id => setProducts(products.filter(x => x.id !== id))} lowStockThreshold={lowStockThreshold} onUpdateThreshold={setLowStockThreshold} collections={collections} currentUserRole={currentUserRole} />;
+      case ViewState.InventoryOut:
+        return <InventoryOut products={products} transactions={transactions} onProcessOut={(type, items, details) => { 
+            // Handle multiple items/variants in a single logistical movement
+            setProducts(prev => prev.map(p => {
+                const productUpdates = items.filter(i => i.productId === p.id);
+                if (productUpdates.length > 0) {
+                    const updatedSizes = p.sizes.map(s => {
+                        const variantUpdate = productUpdates.find(u => u.sizeInternal === s.sizeInternal);
+                        if (variantUpdate) {
+                            const newWhStock = Math.max(0, s.warehouseStock - variantUpdate.quantity);
+                            const newStoreStock = type === TransactionType.Transfer ? s.stock + variantUpdate.quantity : s.stock;
+                            logStockMovement(p.id, p.name, s.sizeInternal, type === TransactionType.Transfer ? StockMovementType.Transfer : StockMovementType.Outward, -variantUpdate.quantity, newStoreStock, newWhStock, `Inventory Movement: ${type} - ${details.orderId || details.recipient}`);
+                            return { ...s, warehouseStock: newWhStock, stock: newStoreStock };
+                        }
+                        return s;
+                    });
+                    return { ...p, sizes: updatedSizes };
+                }
+                return p;
+            }));
+
+            const txItems: CartItem[] = items.map(ui => {
+                const prod = products.find(p => p.id === ui.productId)!;
+                const size = prod.sizes.find(s => s.sizeInternal === ui.sizeInternal)!;
+                return { ...prod, selectedSize: size, quantity: ui.quantity };
+            });
+
+            const subtotal = txItems.reduce((acc, item) => acc + (item.price * item.quantity), 0);
+            const total = subtotal * (1 - (details.discount || 0) / 100);
+
+            const distTxn: Transaction = {
+                id: `MV-${Math.random().toString(36).substr(2, 5).toUpperCase()}`,
+                date: new Date(),
+                type,
+                items: txItems,
+                subtotal,
+                total,
+                paymentMethod: 'N/A',
+                amountPaid: total,
+                balance: 0,
+                isPartial: false,
+                shift: 'Morning',
+                businessDate: new Date().toISOString().split('T')[0],
+                cashierName: currentUser,
+                recipientName: details.recipient,
+                externalOrderId: details.orderId,
+                orderDiscount: details.discount
+            };
+
+            setTransactions(prev => [distTxn, ...prev]);
+            setLastDistribution(distTxn); // Trigger Movement Receipt
+            addAuditLog('Inventory Out', `Logistics Release: ${items.length} variants. ID: ${distTxn.id}`);
+        }} />;
+      case ViewState.StockTrack:
+        return <StockTrackView movements={stockMovements} userRole={currentUserRole} />;
+      case ViewState.Barcodes:
+        return <BarcodeDirectory products={products} onUpdateProduct={p => setProducts(products.map(x => x.id === p.id ? p : x))} collections={collections} brands={[]} userRole={currentUserRole} />;
+      case ViewState.StockReport:
+        return <StockReport products={products} collections={collections} movements={stockMovements} userRole={currentUserRole} />;
+      case ViewState.Transactions:
+        return <TransactionList transactions={transactions} onViewReceipt={setLastTransaction} onReturn={canPerformReturn ? handleProcessReturn : undefined} />;
+      case ViewState.Customers:
+        return <CustomerList customers={customers} onAddCustomer={c => setCustomers([...customers, c])} onEditCustomer={c => setCustomers(customers.map(x => x.id === c.id ? c : x))} onDeleteCustomer={id => setCustomers(customers.filter(x => x.id !== id))} transactions={transactions} userRole={currentUserRole} />;
+      case ViewState.Reports:
+        return <ReportsDashboard shiftHistory={shiftHistory} transactions={transactions} products={products} movements={stockMovements} />;
+      case ViewState.CashierManagement:
+        return <CashierDashboard shiftHistory={shiftHistory} users={users} onAddUser={u => setUsers([...users, u])} onEditUser={u => setUsers(users.map(x => x.id === u.id ? u : x))} onDeleteUser={id => setUsers(users.filter(x => x.id !== id))} currentUserRole={currentUserRole} />;
+      case ViewState.AuditLogs:
+        return <AuditLogsView logs={auditLogs} userRole={currentUserRole} />;
+      case ViewState.Backup:
+        return <BackupExportView data={{ products, transactions, customers, users, shiftHistory, stockMovements }} />;
+      case ViewState.Collections:
+        return <CollectionsView collections={collections} products={products} onAddCollection={c => setCollections([...collections, c])} onDeleteCollection={c => setCollections(collections.filter(x => x !== c))} />;
+      default: return null;
+    }
+  };
+
   if (!isAuthenticated) return <Login users={users} onLogin={handleLogin} />;
   if (currentUserRole === 'Cashier' && !sessionInfo) return <StartShift username={currentUser} onStartShift={handleStartShift} onLogout={handleLogout} />;
 
@@ -460,9 +437,10 @@ const App: React.FC = () => {
       >
         {renderContent()}
       </Layout>
-      {(currentUserRole === 'Cashier') && <AIAssistant products={products} />}
+      <AIAssistant products={products} />
       <PaymentModal isOpen={isPaymentModalOpen} total={pendingCheckout?.amountPaid || 0} onClose={() => setIsPaymentModalOpen(false)} onConfirm={handlePaymentConfirm} />
       <ReceiptModal transaction={lastTransaction} onClose={() => setLastTransaction(null)} />
+      <DistributionReceiptModal transaction={lastDistribution} onClose={() => setLastDistribution(null)} />
       {sessionInfo && <EndShiftModal isOpen={showEndShiftModal} onClose={() => setShowEndShiftModal(false)} onConfirmEndShift={confirmEndShift} sessionInfo={sessionInfo} transactions={transactions} />}
     </>
   );

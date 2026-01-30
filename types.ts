@@ -1,4 +1,5 @@
 
+
 export enum Collection {
   All = 'All',
   WinterEditII = 'Winter Edit II',
@@ -13,7 +14,7 @@ export interface ProductSize {
   sizeInternal: string; // e.g. "1"
   stock: number;        // Store Stock
   warehouseStock: number;
-  barcode?: string;     // Size-specific barcode (Optional override)
+  barcode?: string;     // Size-specific barcode
   price?: number;
 }
 
@@ -21,7 +22,6 @@ export interface Product {
   id: string;           // Internal Article Reference / Style Code
   name: string;
   category: string;
-  brand?: string;
   price: number; 
   image: string;
   description: string;
@@ -31,6 +31,8 @@ export interface Product {
   color?: string;
   parts?: string[];
   createdAt: string; 
+  // Added brand property to match existing usage and fix constants.ts errors
+  brand?: string;
 }
 
 export interface CartItem extends Product {
@@ -56,6 +58,7 @@ export interface CashierUser {
 
 export enum TransactionType {
   Sale = 'Sale',
+  Return = 'Return',
   Shopify = 'Shopify',
   PreOrder = 'PreOrder',
   PR = 'PR',
@@ -65,6 +68,7 @@ export enum TransactionType {
 
 export enum StockMovementType {
   Sale = 'Sale',
+  Return = 'Return',
   Adjustment = 'Adjustment',
   Transfer = 'Transfer',
   Inward = 'Inward',
@@ -97,6 +101,8 @@ export interface Transaction {
   amountPaid: number;
   balance: number;
   isPartial: boolean;
+  cashReceived?: number;
+  changeAmount?: number;
   customer?: Customer;
   shift: 'Morning' | 'Night';
   businessDate: string;
@@ -105,6 +111,7 @@ export interface Transaction {
   externalOrderId?: string;
   recipientName?: string;
   notes?: string;
+  originalTransactionId?: string;
 }
 
 export interface AuditLog {
@@ -144,7 +151,6 @@ export enum ViewState {
   StockReport = 'StockReport',
   Customers = 'Customers',
   Collections = 'Collections',
-  Brands = 'Brands',
   CashierManagement = 'CashierManagement',
   Reports = 'Reports',
   AuditLogs = 'AuditLogs',

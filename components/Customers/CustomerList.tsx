@@ -10,7 +10,6 @@ interface CustomerListProps {
   onAddCustomer: (customer: Customer) => void;
   onEditCustomer: (customer: Customer) => void;
   onDeleteCustomer: (id: string) => void;
-  // Added userRole to satisfy the component call in App.tsx
   userRole?: UserRole | null;
 }
 
@@ -20,7 +19,7 @@ const CustomerList: React.FC<CustomerListProps> = ({
   onAddCustomer, 
   onEditCustomer, 
   onDeleteCustomer,
-  userRole // Destructured userRole to avoid unused property error if it were only in the interface
+  userRole
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -28,17 +27,21 @@ const CustomerList: React.FC<CustomerListProps> = ({
   const [customerToDelete, setCustomerToDelete] = useState<Customer | null>(null);
   const [viewingHistory, setViewingHistory] = useState<Customer | null>(null);
 
+  const isReadOnly = userRole === 'Viewer';
+
   const filteredCustomers = customers.filter(c => 
     c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
     c.phone.includes(searchTerm)
   );
 
   const handleOpenAdd = () => {
+    if (isReadOnly) return;
     setEditingCustomer(null);
     setIsModalOpen(true);
   };
 
   const handleOpenEdit = (customer: Customer) => {
+    if (isReadOnly) return;
     setEditingCustomer(customer);
     setIsModalOpen(true);
   };
@@ -70,13 +73,15 @@ const CustomerList: React.FC<CustomerListProps> = ({
                             className="pl-10 pr-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500 w-64"
                         />
                      </div>
-                     <button 
-                        onClick={handleOpenAdd}
-                        className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors flex items-center gap-2 shadow-sm"
-                     >
-                        <Plus size={16} />
-                        Add Customer
-                     </button>
+                     {!isReadOnly && (
+                         <button 
+                            onClick={handleOpenAdd}
+                            className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors flex items-center gap-2 shadow-sm"
+                         >
+                            <Plus size={16} />
+                            Add Customer
+                         </button>
+                     )}
                 </div>
             </header>
 
@@ -125,20 +130,24 @@ const CustomerList: React.FC<CustomerListProps> = ({
                                         >
                                             <History size={18} />
                                         </button>
-                                        <button 
-                                            onClick={() => handleOpenEdit(customer)}
-                                            className="p-1.5 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-lg transition-colors"
-                                            title="Edit Profile"
-                                        >
-                                            <Pencil size={18} />
-                                        </button>
-                                        <button 
-                                            onClick={() => setCustomerToDelete(customer)}
-                                            className="p-1.5 text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors"
-                                            title="Delete Profile"
-                                        >
-                                            <Trash2 size={18} />
-                                        </button>
+                                        {!isReadOnly && (
+                                            <>
+                                                <button 
+                                                    onClick={() => handleOpenEdit(customer)}
+                                                    className="p-1.5 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-lg transition-colors"
+                                                    title="Edit Profile"
+                                                >
+                                                    <Pencil size={18} />
+                                                </button>
+                                                <button 
+                                                    onClick={() => setCustomerToDelete(customer)}
+                                                    className="p-1.5 text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors"
+                                                    title="Delete Profile"
+                                                >
+                                                    <Trash2 size={18} />
+                                                </button>
+                                            </>
+                                        )}
                                     </div>
                                 </td>
                             </tr>

@@ -1,175 +1,114 @@
 
-import React, { useState } from 'react';
-import { Search, Eye, Calendar, CreditCard, DollarSign, Clock, User } from 'lucide-react';
-import { Transaction } from '../../types';
+import React, { useState, useMemo } from 'react';
+import { Search, Eye, Calendar, DollarSign, RotateCcw, Download, Printer } from 'lucide-react';
+import { Transaction, TransactionType } from '../../types';
 
 interface TransactionListProps {
   transactions: Transaction[];
   onViewReceipt: (transaction: Transaction) => void;
+  onReturn?: (transaction: Transaction) => void;
 }
 
-const TransactionList: React.FC<TransactionListProps> = ({ transactions, onViewReceipt }) => {
+const TransactionList: React.FC<TransactionListProps> = ({ transactions, onViewReceipt, onReturn }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [startDate, setStartDate] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 30);
+    return d.toISOString().split('T')[0];
+  });
+  const [endDate, setEndDate] = useState(() => new Date().toISOString().split('T')[0]);
 
-  const filtered = transactions.filter(t => 
-    t.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    t.customer?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    t.customer?.phone.includes(searchTerm) ||
-    t.recipientName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    t.externalOrderId?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    t.cashierName.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  const totalRevenue = transactions.reduce((acc, t) => acc + t.amountPaid, 0); 
-  const totalReceivables = transactions.reduce((acc, t) => acc + t.balance, 0);
+  const filtered = useMemo(() => {
+    return transactions.filter(t => {
+      const matchesSearch = t.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        t.customer?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        t.recipientName?.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      // Exact string comparison for business dates (YYYY-MM-DD)
+      const inRange = t.businessDate >= startDate && t.businessDate <= endDate;
+      
+      return matchesSearch && inRange;
+    });
+  }, [transactions, searchTerm, startDate, endDate]);
 
   return (
-    <div className="p-8 h-full overflow-y-auto bg-gray-50 dark:bg-gray-900 transition-colors duration-200">
-      <div className="max-w-6xl mx-auto">
-         <header className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="p-8 h-full overflow-y-auto bg-gray-50 dark:bg-gray-950 transition-colors duration-200">
+      <div className="max-w-7xl mx-auto space-y-8">
+         <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 print:hidden">
             <div>
-                <h1 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight">Transaction History</h1>
-                <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">Review and manage past point-of-sale and outbound activities.</p>
+                <h1 className="text-2xl font-black text-gray-900 dark:text-white uppercase tracking-tight">Order Ledger</h1>
+                <p className="text-gray-500 dark:text-gray-400 text-xs font-bold uppercase tracking-widest mt-1">Multi-Channel Sales & Returns</p>
             </div>
-            <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500" size={18} />
-                <input 
-                    type="text" 
-                    placeholder="Search ID, Order#, Name..." 
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10 pr-4 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 w-48 md:w-64 transition-all"
-                />
+            <div className="flex gap-3 bg-white dark:bg-gray-900 p-1.5 rounded-xl border border-gray-100 dark:border-gray-800 shadow-sm">
+                <div className="flex items-center px-2">
+                  <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest mr-2">From</span>
+                  <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="bg-transparent text-[10px] font-black uppercase outline-none dark:text-white" />
+                </div>
+                <div className="w-px h-6 bg-gray-100 dark:bg-gray-800 mx-1"></div>
+                <div className="flex items-center px-2">
+                  <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest mr-2">To</span>
+                  <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="bg-transparent text-[10px] font-black uppercase outline-none dark:text-white" />
+                </div>
             </div>
         </header>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-            <div className="bg-white dark:bg-gray-800 p-6 rounded-[2rem] border border-gray-100 dark:border-gray-700 shadow-sm transition-all">
-                <div className="flex items-center gap-3 mb-2">
-                    <div className="p-2 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-lg">
-                        <DollarSign size={20} />
-                    </div>
-                    <span className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Collected</span>
-                </div>
-                <div className="text-2xl font-black text-gray-900 dark:text-white">
-                    ₨ {totalRevenue.toFixed(2)}
-                </div>
-            </div>
-             <div className="bg-white dark:bg-gray-800 p-6 rounded-[2rem] border border-gray-100 dark:border-gray-700 shadow-sm transition-all">
-                <div className="flex items-center gap-3 mb-2">
-                    <div className="p-2 bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 rounded-lg">
-                        <Clock size={20} />
-                    </div>
-                    <span className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Pending</span>
-                </div>
-                <div className="text-2xl font-black text-amber-600 dark:text-amber-400">
-                    ₨ {totalReceivables.toFixed(2)}
-                </div>
-            </div>
-             <div className="bg-white dark:bg-gray-800 p-6 rounded-[2rem] border border-gray-100 dark:border-gray-700 shadow-sm transition-all">
-                <div className="flex items-center gap-3 mb-2">
-                    <div className="p-2 bg-emerald-50 dark:bg-indigo-900/30 text-emerald-600 dark:text-emerald-400 rounded-lg">
-                        <Calendar size={20} />
-                    </div>
-                    <span className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Transactions</span>
-                </div>
-                <div className="text-2xl font-black text-gray-900 dark:text-white">
-                    {transactions.length}
-                </div>
-            </div>
-             <div className="bg-white dark:bg-gray-800 p-6 rounded-[2rem] border border-gray-100 dark:border-gray-700 shadow-sm transition-all">
-                <div className="flex items-center gap-3 mb-2">
-                    <div className="p-2 bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 rounded-lg">
-                        <CreditCard size={20} />
-                    </div>
-                    <span className="text-[10px] font-black uppercase text-gray-400 tracking-widest">AOV</span>
-                </div>
-                <div className="text-2xl font-black text-gray-900 dark:text-white">
-                    ₨ {transactions.length > 0 ? (transactions.reduce((acc, t) => acc + t.total, 0) / transactions.length).toFixed(0) : '0'}
-                </div>
-            </div>
+        <div className="relative print:hidden">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+            <input 
+                type="text" 
+                placeholder="Find Transactions, Customers, ID..." 
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                className="w-full pl-12 pr-6 py-4 bg-white dark:bg-gray-900 rounded-[1.5rem] border border-gray-100 dark:border-gray-800 font-black text-xs uppercase tracking-widest outline-none transition-all focus:ring-4 focus:ring-indigo-500/10 shadow-sm"
+            />
         </div>
 
-        {/* Table */}
-        <div className="bg-white dark:bg-gray-800 rounded-[2.5rem] shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
-             <table className="w-full text-left border-collapse">
-                <thead className="bg-gray-50/50 dark:bg-gray-900/20 border-b border-gray-50 dark:border-gray-700 text-[10px] uppercase text-gray-400 dark:text-gray-500 font-black tracking-widest">
+        <div className="bg-white dark:bg-gray-900 rounded-[2.5rem] border border-gray-100 dark:border-gray-800 shadow-sm overflow-hidden">
+            <table className="w-full text-left border-collapse">
+                <thead className="bg-gray-50/50 dark:bg-gray-800/50 text-[10px] font-black uppercase text-gray-400 tracking-[0.2em] border-b border-gray-50 dark:border-gray-800">
                     <tr>
-                        <th className="p-5">Source & ID</th>
-                        <th className="p-5">Type</th>
-                        <th className="p-5">Customer / Recipient</th>
-                        <th className="p-5">Cashier</th>
-                        <th className="p-5 text-right">Total</th>
-                        <th className="p-5 text-center">Action</th>
+                        <th className="p-6">Timestamp & ID</th>
+                        <th className="p-6">Stream</th>
+                        <th className="p-6">Client / Label</th>
+                        <th className="p-6 text-right">Net Value</th>
+                        <th className="p-6 text-center">Action</th>
                     </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
+                <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
                     {filtered.map((t) => (
-                        <tr key={t.id} className="hover:bg-gray-50/50 dark:hover:bg-gray-700/50 transition-colors group">
-                            <td className="p-5">
-                                <div className="flex flex-col">
-                                    <span className="text-xs font-mono text-indigo-600 font-black tracking-tight">#{t.id}</span>
-                                    {t.externalOrderId && (
-                                        <span className="text-[10px] font-bold text-gray-400 mt-0.5 italic">Order: {t.externalOrderId}</span>
-                                    )}
-                                </div>
+                        <tr key={t.id} className="hover:bg-gray-50/50 dark:hover:bg-gray-800/30 transition-colors group">
+                            <td className="p-6">
+                                <div className="text-[11px] font-black dark:text-white uppercase leading-tight">{new Date(t.date).toLocaleDateString()}</div>
+                                <div className="text-[9px] font-mono font-bold text-indigo-500 mt-0.5 uppercase">ID: {t.id}</div>
                             </td>
-                            <td className="p-5">
-                                <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-widest ${
-                                    t.type === 'Sale' ? 'bg-emerald-50 text-emerald-600' :
-                                    t.type === 'Shopify' ? 'bg-indigo-50 text-indigo-600' :
-                                    t.type === 'PR' ? 'bg-pink-50 text-pink-600' :
-                                    'bg-amber-50 text-amber-600'
-                                }`}>
+                            <td className="p-6">
+                                <span className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest ${t.type === TransactionType.Return ? 'bg-red-50 text-red-500 border border-red-100' : 'bg-gray-50 text-gray-400 border border-gray-100'}`}>
                                     {t.type}
                                 </span>
                             </td>
-                            <td className="p-5">
-                                {t.customer || t.recipientName ? (
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-8 h-8 rounded-xl bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-xs font-black text-gray-600 dark:text-gray-300">
-                                            {(t.customer?.name || t.recipientName || '?').charAt(0)}
-                                        </div>
-                                        <div>
-                                            <p className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-tight">{t.customer?.name || t.recipientName}</p>
-                                            {t.customer?.phone && <p className="text-[10px] font-mono text-gray-400">{t.customer.phone}</p>}
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <span className="text-[10px] font-black text-gray-300 dark:text-gray-600 uppercase tracking-widest italic">Guest / No Label</span>
-                                )}
+                            <td className="p-6 text-[11px] font-bold dark:text-gray-300 uppercase tracking-tighter">
+                                {t.customer?.name || t.recipientName || 'Walk-in Guest'}
                             </td>
-                            <td className="p-5">
-                                <div className="flex items-center gap-2">
-                                    <User size={14} className="text-indigo-400" />
-                                    <span className="text-xs font-bold text-gray-700 dark:text-gray-300">{t.cashierName}</span>
-                                </div>
-                            </td>
-                             <td className="p-5 text-right font-black text-gray-900 dark:text-white text-base">
+                            <td className={`p-6 text-right font-black text-sm tracking-tighter ${t.total < 0 ? 'text-red-500' : 'text-gray-900 dark:text-white'}`}>
                                 ₨ {t.total.toLocaleString()}
-                                {t.orderDiscount ? <span className="block text-[9px] text-red-500">Disc: {t.orderDiscount}%</span> : null}
                             </td>
-                            <td className="p-5 text-center">
-                                <button 
-                                    onClick={() => onViewReceipt(t)}
-                                    className="p-2.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-xl transition-all"
-                                    title="View Receipt"
-                                >
-                                    <Eye size={20} />
-                                </button>
+                            <td className="p-6 text-center">
+                                <div className="flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-all">
+                                    <button onClick={() => onViewReceipt(t)} className="p-2 text-gray-400 hover:text-indigo-600 transition-all"><Eye size={18} /></button>
+                                    {t.type === TransactionType.Sale && onReturn && (
+                                        <button onClick={() => onReturn(t)} className="p-2 text-gray-400 hover:text-red-500 transition-all" title="Return/Exchange"><RotateCcw size={18} /></button>
+                                    )}
+                                </div>
                             </td>
                         </tr>
                     ))}
                     {filtered.length === 0 && (
                         <tr>
-                            <td colSpan={6} className="p-20 text-center text-gray-400 dark:text-gray-600 font-bold italic">
-                                No historical transactions match the search criteria.
-                            </td>
+                            <td colSpan={5} className="p-20 text-center text-gray-300 font-black uppercase text-[10px] tracking-widest opacity-50">No logs matching audit scope</td>
                         </tr>
                     )}
                 </tbody>
-             </table>
+            </table>
         </div>
       </div>
     </div>

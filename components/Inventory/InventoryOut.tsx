@@ -1,8 +1,12 @@
 
-import React, { useState, useMemo } from 'react';
-import { Product, TransactionType, Transaction } from '../../types';
-import { Search, ArrowRight, Package, ShoppingBag, Truck, Gift, Users, Ruler, FileText, ScanBarcode, Info, Layers, Tag, Palette, Box, ClipboardList, Clock } from 'lucide-react';
-import BarcodeScannerModal from './BarcodeScannerModal';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { Product, TransactionType, Transaction, ProductSize } from '../../types';
+import { 
+  Search, Download, Printer, Box, ShoppingBag, Truck, Gift, 
+  Users, Clock, Tag, Info, Sparkles, Plus, Barcode as BarcodeIcon, 
+  MousePointer2, ChevronRight, Trash2, Minus, AlertCircle, 
+  ClipboardList, User, Filter, X, History as HistoryIcon 
+} from 'lucide-react';
 
 interface InventoryOutProps {
   products: Product[];
@@ -10,392 +14,404 @@ interface InventoryOutProps {
   onProcessOut: (
     type: TransactionType, 
     items: { productId: string; sizeInternal: string; quantity: number }[], 
-    details: { 
-        orderId?: string; 
-        recipient?: string; 
-        discount?: number;
-    }
+    details: { orderId?: string; recipient?: string; discount?: number; }
   ) => void;
 }
 
+interface CartItem {
+    product: Product;
+    size: ProductSize;
+    quantity: number;
+}
+
 const InventoryOut: React.FC<InventoryOutProps> = ({ products, transactions, onProcessOut }) => {
-  const [selectedType, setSelectedType] = useState<TransactionType>(TransactionType.Shopify);
+  const [selectedType, setSelectedType] = useState<TransactionType | 'ALL'>('ALL');
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [selectedSizeIdx, setSelectedSizeIdx] = useState(0);
-  const [quantity, setQuantity] = useState('1'); // String state to allow clearing
-  const [orderDetails, setOrderDetails] = useState({ orderId: '', recipient: '', discount: '' }); // String discount
-  const [isScannerOpen, setIsScannerOpen] = useState(false);
+  const [isScanMode, setIsScanMode] = useState(false);
+  const [historySearch, setHistorySearch] = useState('');
+  const [selectedArticleId, setSelectedArticleId] = useState<string>('ALL');
+  
+  // Local Cart for Distribution
+  const [outflowCart, setOutflowCart] = useState<CartItem[]>([]);
+  const [details, setDetails] = useState({ orderId: '', recipient: '', discount: '' });
+  const [showError, setShowError] = useState(false);
+  
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  const filteredProducts = products.filter(p => 
-    p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    p.id.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  const workflowTransactions = useMemo(() => {
-    return transactions.filter(t => t.type === selectedType);
-  }, [transactions, selectedType]);
-
-  const handleBarcodeScanned = (scannedCode: string) => {
-    setIsScannerOpen(false);
-    let matchedSizeIdx = 0;
-    const product = products.find(p => {
-      if (p.id === scannedCode) {
-        matchedSizeIdx = 0;
-        return true;
-      }
-      const sizeIndex = p.sizes.findIndex(s => 
-        s.barcode === scannedCode || `${p.id}-${s.sizeInternal}` === scannedCode
-      );
-      if (sizeIndex !== -1) {
-        matchedSizeIdx = sizeIndex;
-        return true;
-      }
-      return false;
-    });
-
-    if (product) {
-        setSelectedProduct(product);
-        setSelectedSizeIdx(matchedSizeIdx);
-        setSearchTerm('');
-    } else {
-        alert(`No article found for code: ${scannedCode}`);
+  useEffect(() => {
+    if (isScanMode && inputRef.current) {
+      inputRef.current.focus();
     }
-  };
+  }, [isScanMode]);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedProduct) return;
-    const size = selectedProduct.sizes[selectedSizeIdx];
-    const finalQty = parseInt(quantity) || 1;
-    const finalDiscount = parseFloat(orderDetails.discount) || 0;
-
-    onProcessOut(
-        selectedType, 
-        [{ productId: selectedProduct.id, sizeInternal: size.sizeInternal, quantity: finalQty }], 
-        { orderId: orderDetails.orderId, recipient: orderDetails.recipient, discount: finalDiscount }
+  const filteredProducts = useMemo(() => {
+    if (!searchTerm.trim()) return products.slice(0, 8);
+    return products.filter(p => 
+      p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+      p.id.toLowerCase().includes(searchTerm.toLowerCase())
     );
+  }, [products, searchTerm]);
 
-    setSelectedProduct(null);
-    setQuantity('1');
-    setOrderDetails({ orderId: '', recipient: '', discount: '' });
+  const addToCart = (product: Product, size: ProductSize) => {
+    if (size.warehouseStock <= 0) return;
+    
+    setOutflowCart(prev => {
+        const existing = prev.find(item => item.product.id === product.id && item.size.sizeInternal === size.sizeInternal);
+        if (existing) {
+            if (existing.quantity >= size.warehouseStock) return prev;
+            return prev.map(item => (item.product.id === product.id && item.size.sizeInternal === size.sizeInternal) 
+                ? { ...item, quantity: item.quantity + 1 } 
+                : item);
+        }
+        return [...prev, { product, size, quantity: 1 }];
+    });
     setSearchTerm('');
   };
 
-  const getPricePreview = () => {
-    if (!selectedProduct) return 0;
-    if (selectedType === TransactionType.PR) return 0;
-    const basePrice = selectedProduct.sizes[selectedSizeIdx].price || selectedProduct.price;
-    const disc = parseFloat(orderDetails.discount) || 0;
-    return basePrice * (1 - disc / 100);
+  const updateCartQty = (productId: string, sizeInternal: string, delta: number) => {
+    setOutflowCart(prev => prev.map(item => {
+        if (item.product.id === productId && item.size.sizeInternal === sizeInternal) {
+            const newQty = Math.max(0, item.quantity + delta);
+            if (newQty > item.size.warehouseStock) return item;
+            return { ...item, quantity: newQty };
+        }
+        return item;
+    }).filter(item => item.quantity > 0));
   };
 
-  const handleDiscountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let val = e.target.value;
-    if (val === '') {
-      setOrderDetails({ ...orderDetails, discount: '' });
-      return;
-    }
-    const num = parseFloat(val);
-    if (!isNaN(num)) {
-      const clamped = Math.min(100, Math.max(0, num));
-      setOrderDetails({ ...orderDetails, discount: clamped.toString() });
+  const removeFromCart = (productId: string, sizeInternal: string) => {
+    setOutflowCart(prev => prev.filter(item => !(item.product.id === productId && item.size.sizeInternal === sizeInternal)));
+  };
+
+  const handleScanSubmit = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const query = searchTerm.trim().toUpperCase();
+    if (!query) return;
+
+    for (const p of products) {
+      const sizeMatch = (p.sizes || []).find(s => 
+        (s.barcode?.toUpperCase() === query) || 
+        (`${p.id}-${s.sizeInternal}`.toUpperCase() === query)
+      );
+
+      if (sizeMatch) {
+        addToCart(p, sizeMatch);
+        return;
+      }
     }
   };
+
+  const handleFinalize = () => {
+    if (outflowCart.length === 0) return;
+    
+    const finalizeType = selectedType === 'ALL' ? TransactionType.Shopify : selectedType as TransactionType;
+
+    // For Transfer (Store Movement), orderId is used for tracking but we can auto-fill for convenience
+    const orderRef = details.orderId.trim() || (finalizeType === TransactionType.Transfer ? `TRANSFER-${Date.now()}` : '');
+
+    if (!orderRef && finalizeType !== TransactionType.Transfer) {
+        setShowError(true);
+        setTimeout(() => setShowError(false), 3000);
+        return;
+    }
+
+    const items = outflowCart.map(item => ({
+        productId: item.product.id,
+        sizeInternal: item.size.sizeInternal,
+        quantity: item.quantity
+    }));
+
+    onProcessOut(
+        finalizeType, 
+        items, 
+        { orderId: orderRef, recipient: details.recipient, discount: parseFloat(details.discount) || 0 }
+    );
+    
+    setOutflowCart([]);
+    setDetails({ orderId: '', recipient: '', discount: '' });
+    setShowError(false);
+  };
+
+  const workflowTransactions = useMemo(() => {
+    return transactions.filter(t => {
+        const matchesType = selectedType === 'ALL' || t.type === selectedType;
+        const matchesArticle = selectedArticleId === 'ALL' || (t.items || []).some(i => i.id === selectedArticleId);
+        const matchesSearch = historySearch === '' || 
+            (t.items || []).some(i => i.name.toLowerCase().includes(historySearch.toLowerCase()) || i.id.toLowerCase().includes(historySearch.toLowerCase())) ||
+            t.externalOrderId?.toLowerCase().includes(historySearch.toLowerCase()) ||
+            t.recipientName?.toLowerCase().includes(historySearch.toLowerCase());
+        
+        return matchesType && matchesArticle && matchesSearch;
+    });
+  }, [transactions, selectedType, historySearch, selectedArticleId]);
+
+  const types = [
+    { id: 'ALL', label: 'All Log', icon: Filter, color: 'text-gray-600 bg-gray-50 dark:bg-gray-800' },
+    { id: TransactionType.Transfer, label: 'Move to Store', icon: Truck, color: 'text-cyan-600 bg-cyan-50 dark:bg-cyan-900/20' },
+    { id: TransactionType.Shopify, label: 'Shopify', icon: ShoppingBag, color: 'text-blue-600 bg-blue-50 dark:bg-blue-900/20' },
+    { id: TransactionType.PreOrder, label: 'Pre-Order', icon: Clock, color: 'text-amber-600 bg-amber-50 dark:bg-amber-900/20' },
+    { id: TransactionType.PR, label: 'PR/Gift', icon: Gift, color: 'text-rose-600 bg-rose-50 dark:bg-rose-900/20' },
+    { id: TransactionType.FnF, label: 'F&F', icon: Users, color: 'text-purple-600 bg-purple-50 dark:bg-purple-900/20' },
+  ];
 
   return (
-    <div className="p-8 h-full overflow-y-auto bg-gray-50 dark:bg-gray-900 transition-colors duration-200">
-      <div className="max-w-6xl mx-auto space-y-8">
-        <header>
-            <h1 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight uppercase">Inventory OUT</h1>
-            <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">Direct Warehouse Outflows & Transfers</p>
+    <div className="flex flex-col lg:flex-row h-full overflow-hidden bg-gray-50 dark:bg-gray-950 transition-colors duration-200">
+      
+      {/* Left Pane: Item Picker */}
+      <div className="flex-1 flex flex-col min-w-0 print:hidden">
+        <header className="p-6 pb-2 border-b border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+                <div>
+                    <h1 className="text-xl font-black text-gray-900 dark:text-white uppercase tracking-tight leading-none">Logistics Control</h1>
+                    <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest mt-1">Movement from Warehouse to POS or External</p>
+                </div>
+                <div className="flex flex-wrap gap-1 p-0.5 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
+                    {types.map(t => (
+                        <button 
+                            key={t.id} 
+                            onClick={() => { setSelectedType(t.id as any); }}
+                            className={`px-3 py-1.5 rounded-md text-[9px] font-black uppercase tracking-wider transition-all flex items-center gap-1.5 whitespace-nowrap ${
+                                selectedType === t.id 
+                                ? `${t.color} ring-1 ring-current shadow-sm` 
+                                : 'text-gray-400 hover:text-gray-600'
+                            }`}
+                        >
+                            <t.icon size={12} />
+                            {t.label}
+                        </button>
+                    ))}
+                </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-center gap-2 mb-4">
+                <div className="relative flex-1 w-full group">
+                    <div className={`absolute left-3.5 top-1/2 -translate-y-1/2 transition-colors ${isScanMode ? 'text-indigo-600' : 'text-gray-400'}`}>
+                        {isScanMode ? <BarcodeIcon size={16} strokeWidth={2.5} /> : <Search size={16} />}
+                    </div>
+                    <form onSubmit={isScanMode ? handleScanSubmit : e => e.preventDefault()} className="w-full">
+                        <input 
+                            ref={inputRef}
+                            type="text" 
+                            placeholder={isScanMode ? "SCAN SKU TO MOVE..." : "Search article to move..."} 
+                            value={searchTerm} 
+                            onChange={e => setSearchTerm(e.target.value)}
+                            className={`w-full pl-10 pr-4 py-2 bg-gray-50 dark:bg-gray-800 border-2 rounded-xl font-bold text-[11px] outline-none transition-all ${
+                                isScanMode ? 'border-indigo-500 ring-2 ring-indigo-500/10' : 'border-transparent focus:border-indigo-500'
+                            }`}
+                        />
+                    </form>
+                </div>
+
+                <div className="flex bg-gray-100 dark:bg-gray-800 p-0.5 rounded-xl border border-gray-200 dark:border-gray-700 h-[38px] shrink-0">
+                    <button onClick={() => setIsScanMode(false)} className={`flex items-center gap-1.5 px-3 rounded-lg transition-all ${!isScanMode ? 'bg-white dark:bg-gray-700 text-indigo-600 shadow-sm' : 'text-gray-400'}`}>
+                        <MousePointer2 size={12} />
+                        <span className="text-[8px] font-black uppercase tracking-widest hidden sm:block">Search</span>
+                    </button>
+                    <button onClick={() => setIsScanMode(true)} className={`flex items-center gap-1.5 px-3 rounded-lg transition-all ${isScanMode ? 'bg-indigo-600 text-white shadow-sm' : 'text-gray-400'}`}>
+                        <BarcodeIcon size={12} />
+                        <span className="text-[8px] font-black uppercase tracking-widest hidden sm:block">Scan</span>
+                    </button>
+                </div>
+            </div>
         </header>
 
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-            {[
-                { type: TransactionType.Shopify, label: 'Shopify', icon: ShoppingBag },
-                { type: TransactionType.PreOrder, label: 'Pre-Order', icon: Package },
-                { type: TransactionType.PR, label: 'PR / Gift', icon: Gift },
-                { type: TransactionType.FnF, label: 'F & F', icon: Users },
-                { type: TransactionType.Transfer, label: 'Transfer', icon: Truck },
-            ].map((item) => (
-                <button
-                    key={item.type}
-                    onClick={() => { setSelectedType(item.type); setSelectedProduct(null); }}
-                    className={`group flex items-center gap-3 p-4 rounded-2xl border-2 transition-all duration-300 ${
-                        selectedType === item.type 
-                        ? 'border-indigo-600 bg-indigo-600 text-white shadow-xl' 
-                        : 'border-white dark:border-gray-800 bg-white dark:bg-gray-800 text-gray-400 hover:border-indigo-50 dark:hover:border-gray-700'
-                    }`}
-                >
-                    <item.icon size={18} />
-                    <span className="text-[10px] font-black uppercase tracking-widest leading-none">{item.label}</span>
-                </button>
-            ))}
-        </div>
-
-        <div className="bg-white dark:bg-gray-800 rounded-[2.5rem] shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
-            <div className="px-8 py-5 border-b border-gray-50 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/20 flex justify-between items-center">
-                <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 bg-white dark:bg-gray-700 rounded-xl flex items-center justify-center shadow-sm text-indigo-600">
-                        <Info size={18} />
-                    </div>
-                    <div>
-                        <h2 className="font-black text-gray-900 dark:text-white uppercase text-xs tracking-widest">
-                            {selectedType} Entry
-                        </h2>
-                    </div>
-                </div>
-                {!selectedProduct && (
-                    <button 
-                        onClick={() => setIsScannerOpen(true)}
-                        className="flex items-center gap-2 px-5 py-2 bg-indigo-600 text-white rounded-xl text-[10px] font-black hover:bg-indigo-700 transition-all uppercase tracking-widest shadow-md"
-                    >
-                        <ScanBarcode size={16} />
-                        Manual Scan
-                    </button>
-                )}
-            </div>
-            
-            <div className="p-10">
-                {!selectedProduct ? (
-                    <div className="flex flex-col items-start gap-4 min-h-[60px] justify-center">
-                        {selectedType !== TransactionType.Shopify ? (
-                            <div className="relative group w-full max-w-xs animate-in fade-in slide-in-from-left-2">
-                                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-indigo-500" size={18} />
-                                <input 
-                                    autoFocus
-                                    type="text" 
-                                    placeholder="Search Article..."
-                                    value={searchTerm}
-                                    onChange={(e) => setSearchTerm(e.target.value)}
-                                    className="w-full pl-12 pr-6 py-4 bg-gray-50 dark:bg-gray-700/50 border border-gray-100 dark:border-gray-600 rounded-[1.5rem] text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all dark:text-white"
-                                />
-                                {searchTerm && (
-                                    <div className="absolute top-full left-0 right-0 mt-3 z-30 border border-gray-100 dark:border-gray-700 rounded-[1.5rem] overflow-hidden bg-white dark:bg-gray-800 shadow-2xl animate-in fade-in slide-in-from-top-2 duration-300">
-                                        {filteredProducts.map(product => (
-                                            <button
-                                                key={product.id}
-                                                onClick={() => { setSelectedProduct(product); setSelectedSizeIdx(0); }}
-                                                className="w-full text-left p-4 hover:bg-gray-50 dark:hover:bg-gray-700 border-b border-gray-50 dark:border-gray-700 last:border-0 flex items-center justify-between"
-                                            >
-                                                <div className="flex items-center gap-4">
-                                                    <div className="w-10 h-10 rounded-lg overflow-hidden bg-gray-100 shadow-inner">
-                                                        <img src={product.image} className="w-full h-full object-cover" />
-                                                    </div>
-                                                    <div>
-                                                        <p className="font-black text-gray-900 dark:text-white text-xs">{product.name}</p>
-                                                        <p className="text-[9px] font-black text-indigo-600 uppercase mt-0.5">{product.id}</p>
-                                                    </div>
-                                                </div>
-                                                <ArrowRight size={18} className="text-gray-300" />
-                                            </button>
-                                        ))}
-                                    </div>
-                                )}
+        <div className="flex-1 overflow-y-auto p-6 bg-gray-50 dark:bg-gray-950/30">
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+                {filteredProducts.map(p => (
+                    <div key={p.id} className="bg-white dark:bg-gray-900 p-4 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm">
+                        <div className="flex items-center gap-3 mb-4">
+                            <img src={p.image} className="w-10 h-10 rounded-xl object-cover" />
+                            <div className="min-w-0">
+                                <h3 className="text-[11px] font-black dark:text-white uppercase truncate">{p.name}</h3>
+                                <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">#{p.id}</p>
                             </div>
-                        ) : (
-                          <div className="w-full h-full min-h-[60px] flex items-center justify-start">
-                          </div>
-                        )}
-                    </div>
-                ) : (
-                    <form onSubmit={handleSubmit} className="animate-in fade-in slide-in-from-right-3 duration-300">
-                         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 mb-10">
-                            <div className="lg:col-span-3">
-                                <div className="aspect-square rounded-[2rem] overflow-hidden shadow-2xl bg-gray-100 dark:bg-gray-700 border-4 border-white dark:border-gray-800">
-                                    <img src={selectedProduct.image} className="w-full h-full object-cover" alt={selectedProduct.name} />
-                                </div>
-                            </div>
-                            <div className="lg:col-span-9 flex flex-col justify-center">
-                                <div className="flex justify-between items-start mb-8">
-                                    <div className="text-left">
-                                        <h3 className="font-black text-4xl text-gray-900 dark:text-white leading-tight">{selectedProduct.name}</h3>
-                                        <div className="flex items-center gap-3 mt-2">
-                                            <span className="text-[10px] font-black px-2 py-0.5 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded uppercase">{selectedProduct.id}</span>
-                                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{selectedProduct.brand}</span>
+                        </div>
+                        <div className="space-y-1.5">
+                            {(p.sizes || []).map((s, idx) => {
+                                const inCart = outflowCart.find(c => c.product.id === p.id && c.size.sizeInternal === s.sizeInternal);
+                                const available = s.warehouseStock - (inCart?.quantity || 0);
+                                const isExhausted = available <= 0;
+                                return (
+                                    <button 
+                                        key={idx}
+                                        disabled={isExhausted}
+                                        onClick={() => addToCart(p, s)}
+                                        className={`w-full flex items-center justify-between px-3 py-2 rounded-lg border text-left transition-all ${
+                                            isExhausted 
+                                            ? 'bg-gray-50 dark:bg-gray-800 border-transparent opacity-40 cursor-not-allowed' 
+                                            : 'bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700 hover:border-indigo-600 group'
+                                        }`}
+                                    >
+                                        <div className="flex flex-col">
+                                            <span className="text-[10px] font-black dark:text-white uppercase">Size {s.sizeInternal}</span>
+                                            <span className="text-[8px] text-gray-400 font-bold">{available} WH Stock</span>
                                         </div>
-                                    </div>
-                                    <button type="button" onClick={() => setSelectedProduct(null)} className="text-[10px] font-black text-red-500 bg-red-50 dark:bg-red-900/20 px-4 py-2 rounded-full hover:bg-red-100 transition-colors uppercase tracking-widest">Reset</button>
-                                </div>
-
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div className="p-5 bg-gray-50 dark:bg-gray-700/50 rounded-2xl border border-gray-100 dark:border-gray-600 text-left">
-                                        <div className="text-[9px] font-black text-gray-400 uppercase mb-2">Category</div>
-                                        <div className="text-sm font-bold dark:text-white uppercase">{selectedProduct.category}</div>
-                                    </div>
-                                    {selectedType !== TransactionType.Transfer && (
-                                        <div className="p-5 bg-gray-50 dark:bg-gray-700/50 rounded-2xl border border-gray-100 dark:border-gray-600 text-left">
-                                            <div className="text-[9px] font-black text-gray-400 uppercase mb-2 tracking-widest">Outflow Value</div>
-                                            <div className="text-sm font-black text-emerald-600 dark:text-emerald-400 uppercase">
-                                                {selectedType === TransactionType.PR ? '₨ 0 (PR)' : `₨ ${getPricePreview().toLocaleString()}`}
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                         </div>
-
-                         <div className="bg-indigo-50/50 dark:bg-indigo-900/10 p-8 rounded-[2.5rem] border border-indigo-100 dark:border-indigo-800/50 space-y-8">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-left">
-                                <div>
-                                    <label className="text-[10px] font-black text-indigo-600 uppercase tracking-widest block mb-3 ml-1">Variant Size</label>
-                                    <div className="relative">
-                                        <select 
-                                            value={selectedSizeIdx}
-                                            onChange={(e) => setSelectedSizeIdx(parseInt(e.target.value))}
-                                            className="w-full px-6 py-4 bg-white dark:bg-gray-800 border-2 border-indigo-100 dark:border-indigo-900 rounded-2xl text-base font-black text-indigo-700 dark:text-indigo-300 outline-none appearance-none"
-                                        >
-                                            {selectedProduct.sizes.map((s, idx) => (
-                                                <option key={idx} value={idx}>{s.sizeInternal} ({s.size}) — {s.warehouseStock} WH stock</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                </div>
-                                <div>
-                                    <label className="text-[10px] font-black text-indigo-600 uppercase tracking-widest block mb-3 ml-1">Removal Qty</label>
-                                    <input 
-                                        type="number" 
-                                        min="1" 
-                                        max={selectedProduct.sizes[selectedSizeIdx].warehouseStock} 
-                                        value={quantity} 
-                                        onChange={(e) => setQuantity(e.target.value)} 
-                                        className="w-full px-6 py-4 bg-white dark:bg-gray-800 border-2 border-indigo-100 dark:border-indigo-900 rounded-2xl text-xl font-black text-indigo-700 dark:text-indigo-300 outline-none text-center" 
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-left">
-                                {selectedType === TransactionType.Shopify && (
-                                    <div className="md:col-span-2">
-                                        <label className="text-[10px] font-black text-indigo-600 uppercase tracking-widest block mb-3 ml-1">Order # Ref <span className="text-red-500">*</span></label>
-                                        <input 
-                                            required 
-                                            placeholder="e.g. #SHOP-9921" 
-                                            value={orderDetails.orderId} 
-                                            onChange={(e) => setOrderDetails({...orderDetails, orderId: e.target.value})} 
-                                            className="w-full px-6 py-4 bg-white dark:bg-gray-800 border border-indigo-100 dark:border-indigo-900 rounded-2xl font-bold dark:text-white outline-none focus:ring-4 focus:ring-indigo-500/10" 
-                                        />
-                                    </div>
-                                )}
-                                {(selectedType === TransactionType.PR || selectedType === TransactionType.FnF || selectedType === TransactionType.PreOrder) && (
-                                    <div className={selectedType === TransactionType.FnF ? 'md:col-span-1' : 'md:col-span-2'}>
-                                        <label className="text-[10px] font-black text-indigo-600 uppercase tracking-widest block mb-3 ml-1">
-                                            Recipient Identity <span className="text-red-500">*</span>
-                                        </label>
-                                        <input 
-                                            required 
-                                            placeholder="Full Name" 
-                                            value={orderDetails.recipient} 
-                                            onChange={(e) => setOrderDetails({...orderDetails, recipient: e.target.value})} 
-                                            className="w-full px-6 py-4 bg-white dark:bg-gray-800 border border-indigo-100 dark:border-indigo-900 rounded-2xl font-bold dark:text-white outline-none focus:ring-4 focus:ring-indigo-500/10" 
-                                        />
-                                    </div>
-                                )}
-                                {selectedType === TransactionType.FnF && (
-                                    <div>
-                                        <label className="text-[10px] font-black text-indigo-600 uppercase tracking-widest block mb-3 ml-1">Discount (%)</label>
-                                        <input 
-                                            type="number" 
-                                            min="0"
-                                            max="100"
-                                            value={orderDetails.discount} 
-                                            onChange={handleDiscountChange} 
-                                            className="w-full px-6 py-4 bg-white dark:bg-gray-800 border border-indigo-100 dark:border-indigo-900 rounded-2xl font-black text-indigo-700 outline-none focus:ring-4 focus:ring-indigo-500/10" 
-                                        />
-                                    </div>
-                                )}
-                            </div>
-
-                            <button type="submit" className="w-full py-5 bg-indigo-600 text-white font-black rounded-[1.5rem] shadow-2xl shadow-indigo-100 dark:shadow-none hover:bg-indigo-700 transition-all uppercase tracking-[0.2em] text-xs flex items-center justify-center gap-4 active:scale-[0.98]">
-                                <Box size={22} strokeWidth={3} />
-                                Confirm Movement
-                            </button>
-                         </div>
-                    </form>
-                )}
+                                        {!isExhausted && <Plus size={14} className="text-gray-300 group-hover:text-indigo-600" />}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+                ))}
             </div>
-        </div>
-
-        <div className="bg-white dark:bg-gray-800 rounded-[2.5rem] shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
-             <div className="px-8 py-6 border-b border-gray-50 dark:border-gray-700 flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 bg-indigo-50 dark:bg-indigo-900/30 rounded-2xl flex items-center justify-center text-indigo-600">
-                        <ClipboardList size={22} />
-                    </div>
-                    <div className="text-left">
-                        <h3 className="font-black text-gray-900 dark:text-white uppercase tracking-tight text-sm">{selectedType} Logs</h3>
-                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Active session removals</p>
-                    </div>
-                </div>
-                <div className="px-4 py-1.5 bg-gray-50 dark:bg-gray-700 rounded-full text-[10px] font-black uppercase text-gray-500 flex items-center gap-2">
-                    <Clock size={12} />
-                    {workflowTransactions.length} Transactions
-                </div>
-             </div>
-             
-             <div className="overflow-x-auto">
-                 <table className="w-full text-left border-collapse">
-                    <thead className="bg-gray-50/50 dark:bg-gray-900/20 text-[10px] uppercase font-black text-gray-400 tracking-[0.15em] border-b border-gray-50 dark:border-gray-700">
-                        <tr>
-                            <th className="p-6">Time</th>
-                            {selectedType === TransactionType.Shopify && <th className="p-6">Order #</th>}
-                            {(selectedType === TransactionType.PR || selectedType === TransactionType.PreOrder || selectedType === TransactionType.FnF) && <th className="p-6">Name</th>}
-                            <th className="p-6">Article</th>
-                            <th className="p-6 text-center">Variant</th>
-                            <th className="p-6 text-center">Qty</th>
-                            {selectedType !== TransactionType.Transfer && <th className="p-6 text-right">Total</th>}
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
-                        {workflowTransactions.map((t) => (
-                            <tr key={t.id} className="hover:bg-gray-50/50 dark:hover:bg-gray-700/50 transition-colors">
-                                <td className="p-6 text-[11px] font-mono text-gray-500 whitespace-nowrap">
-                                    {t.date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                </td>
-                                {selectedType === TransactionType.Shopify && <td className="p-6 font-black text-indigo-600 text-xs">{t.externalOrderId}</td>}
-                                {(selectedType === TransactionType.PR || selectedType === TransactionType.PreOrder || selectedType === TransactionType.FnF) && (
-                                    <td className="p-6 font-black text-gray-900 dark:text-white text-xs uppercase tracking-tight">{t.recipientName}</td>
-                                )}
-                                <td className="p-6">
-                                    <div className="flex flex-col text-left">
-                                        <span className="text-xs font-black text-gray-800 dark:text-gray-200">{t.items[0]?.name}</span>
-                                        <span className="text-[9px] font-mono text-indigo-500 font-bold uppercase mt-0.5">{t.items[0]?.id}</span>
-                                    </div>
-                                </td>
-                                <td className="p-6 text-center font-black text-[11px] text-gray-500 uppercase tracking-tighter">
-                                    Size {t.items[0]?.selectedSize.sizeInternal}
-                                </td>
-                                <td className="p-6 text-center">
-                                    <span className="px-3 py-1 bg-gray-100 dark:bg-gray-700 rounded-lg font-black text-xs text-indigo-600">
-                                        {t.items[0]?.quantity}
-                                    </span>
-                                </td>
-                                {selectedType !== TransactionType.Transfer && (
-                                    <td className="p-6 text-right font-black text-sm text-gray-900 dark:text-white">
-                                        ₨ {t.total.toLocaleString()}
-                                    </td>
-                                )}
-                            </tr>
-                        ))}
-                        {workflowTransactions.length === 0 && (
-                            <tr>
-                                <td colSpan={10} className="p-20 text-center text-gray-300 dark:text-gray-600 text-[10px] font-black uppercase tracking-[0.2em] italic">
-                                    No records found for current {selectedType} session
-                                </td>
-                            </tr>
-                        )}
-                    </tbody>
-                 </table>
-             </div>
         </div>
       </div>
 
-      <BarcodeScannerModal 
-        isOpen={isScannerOpen} 
-        onClose={() => setIsScannerOpen(false)} 
-        onScan={handleBarcodeScanned} 
-      />
+      {/* Right Pane: Distribution Cart & History Audit */}
+      <div className="w-full lg:w-[450px] border-l border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 flex flex-col shadow-2xl z-10 print:static print:w-full print:border-none">
+        
+        <div className="p-6 border-b border-gray-100 dark:border-gray-800 print:hidden">
+            <div className="flex justify-between items-center mb-4">
+                <h2 className="text-lg font-black text-gray-900 dark:text-white uppercase tracking-tight flex items-center gap-2">
+                    <ClipboardList size={20} className="text-indigo-600" />
+                    Movements
+                </h2>
+                <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">WH Dispatch</span>
+            </div>
+            
+            <div className="space-y-3">
+                <div className="relative group">
+                    <Tag className={`absolute left-3 top-1/2 -translate-y-1/2 transition-colors ${showError ? 'text-red-500' : 'text-gray-400'}`} size={14} />
+                    <input 
+                        value={details.orderId}
+                        onChange={e => { setDetails({...details, orderId: e.target.value}); if(showError) setShowError(false); }}
+                        className={`w-full pl-9 pr-4 py-2 bg-gray-50 dark:bg-gray-800 border rounded-xl font-bold text-[10px] uppercase outline-none transition-all ${
+                            showError ? 'border-red-500 ring-2 ring-red-500/10' : 'border-gray-100 dark:border-gray-700 focus:ring-2 focus:ring-indigo-500'
+                        }`} 
+                        placeholder={selectedType === TransactionType.Transfer ? "TRACKING REF (OPTIONAL)" : "ORDER REF # (MANDATORY) *"} 
+                    />
+                </div>
+                <div className="relative">
+                    <User className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+                    <input 
+                        value={details.recipient}
+                        onChange={e => setDetails({...details, recipient: e.target.value})}
+                        className="w-full pl-9 pr-4 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl font-bold text-[10px] uppercase outline-none focus:ring-2 focus:ring-indigo-500" 
+                        placeholder="RECIPIENT / RIDER / STORE CONTACT" 
+                    />
+                </div>
+            </div>
+        </div>
+
+        <div className="flex-1 flex flex-col overflow-hidden">
+            <div className="flex border-b border-gray-100 dark:border-gray-800 print:hidden">
+                <button className="flex-1 py-3 text-[10px] font-black uppercase tracking-widest border-b-2 border-indigo-600 text-indigo-600 bg-indigo-50/20">
+                    Dispatch Queue ({outflowCart.length})
+                </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50/50 dark:bg-gray-950/50 print:bg-white">
+                {outflowCart.length === 0 ? (
+                    <div className="space-y-6 print:hidden">
+                        <div className="bg-white dark:bg-gray-800 p-4 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm space-y-3">
+                            <h3 className="text-[10px] font-black uppercase text-gray-400 tracking-widest flex items-center gap-2">
+                                <HistoryIcon size={14} /> Logistics Audit
+                            </h3>
+                            
+                            <div className="space-y-2">
+                                <label className="text-[9px] font-bold text-gray-400 uppercase tracking-widest block ml-1">Article Identity</label>
+                                <div className="relative">
+                                    <select 
+                                        value={selectedArticleId}
+                                        onChange={e => setSelectedArticleId(e.target.value)}
+                                        className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl font-bold text-[10px] uppercase outline-none appearance-none cursor-pointer"
+                                    >
+                                        <option value="ALL">ALL ARTICLES</option>
+                                        {products.map(p => (
+                                            <option key={p.id} value={p.id}>{p.id} — {p.name}</option>
+                                        ))}
+                                    </select>
+                                    <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                                        <ChevronRight size={14} className="rotate-90 text-gray-400" />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="relative">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+                                <input 
+                                    value={historySearch}
+                                    onChange={e => setHistorySearch(e.target.value)}
+                                    placeholder="Search IDs / Keywords..."
+                                    className="w-full pl-9 pr-4 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-xl font-bold text-[10px] uppercase outline-none"
+                                />
+                            </div>
+                        </div>
+
+                        {workflowTransactions.length === 0 ? (
+                            <div className="h-40 flex flex-col items-center justify-center text-gray-300 dark:text-gray-700 space-y-3">
+                                <Truck size={40} className="opacity-20" />
+                                <p className="text-[9px] font-black uppercase tracking-[0.2em]">Audit Tray Clean</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-2">
+                                <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest mb-1 px-1">Movement Logs ({selectedType})</p>
+                                {workflowTransactions.slice(0, 15).map((t, idx) => (
+                                    <div key={idx} className="bg-white dark:bg-gray-800 p-3 rounded-xl border border-gray-100 dark:border-gray-700 flex justify-between items-center group">
+                                        <div className="min-w-0">
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded ${types.find(ty => ty.id === t.type)?.color || 'bg-gray-100'}`}>
+                                                    {t.type}
+                                                </span>
+                                                <span className="text-[9px] font-black dark:text-white uppercase truncate">ID: {t.externalOrderId || t.id}</span>
+                                            </div>
+                                            <p className="text-[8px] text-gray-400 font-bold uppercase truncate">Target: {t.recipientName || 'Warehouse Staff'}</p>
+                                        </div>
+                                        <div className="text-right shrink-0">
+                                            <p className="text-[10px] font-black text-indigo-600">{t.items.reduce((a, i) => a + i.quantity, 0)} Units</p>
+                                            <p className="text-[8px] text-gray-300 font-bold">{new Date(t.date).toLocaleDateString()}</p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                ) : (
+                    outflowCart.map((item, idx) => (
+                        <div key={idx} className="bg-white dark:bg-gray-800 p-3 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm flex items-center gap-3 animate-in slide-in-from-right-2">
+                            <img src={item.product.image} className="w-10 h-10 rounded-lg object-cover" />
+                            <div className="flex-1 min-w-0">
+                                <h4 className="text-[10px] font-black dark:text-white uppercase truncate">{item.product.name}</h4>
+                                <p className="text-[8px] text-indigo-500 font-black uppercase">Variant: {item.size.sizeInternal}</p>
+                            </div>
+                            <div className="flex items-center gap-1.5 bg-gray-50 dark:bg-gray-900 p-1 rounded-lg border border-gray-100 dark:border-gray-800">
+                                <button onClick={() => updateCartQty(item.product.id, item.size.sizeInternal, -1)} className="p-1 hover:text-red-500 transition-colors"><Minus size={10} /></button>
+                                <span className="text-[10px] font-black dark:text-white w-4 text-center">{item.quantity}</span>
+                                <button onClick={() => updateCartQty(item.product.id, item.size.sizeInternal, 1)} className="p-1 hover:text-indigo-600 transition-colors"><Plus size={10} /></button>
+                            </div>
+                            <button onClick={() => removeFromCart(item.product.id, item.size.sizeInternal)} className="p-1.5 text-gray-300 hover:text-red-500"><Trash2 size={14} /></button>
+                        </div>
+                    ))
+                )}
+            </div>
+        </div>
+
+        <div className="p-6 bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800 space-y-4 print:hidden">
+            <div className="flex justify-between items-center px-1">
+                <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Total Quantity</span>
+                <span className="text-xl font-black text-gray-900 dark:text-white">{outflowCart.reduce((acc, i) => acc + i.quantity, 0)} Units</span>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-2">
+                <button 
+                    disabled={outflowCart.length === 0}
+                    onClick={() => { setOutflowCart([]); setDetails({ orderId: '', recipient: '', discount: '' }); setShowError(false); }}
+                    className="py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-400 font-black text-[9px] uppercase tracking-widest rounded-xl hover:text-red-500 disabled:opacity-30 transition-all"
+                >
+                    Discard
+                </button>
+                <button 
+                    disabled={outflowCart.length === 0}
+                    onClick={handleFinalize}
+                    className={`py-3 text-white font-black text-[9px] uppercase tracking-[0.15em] rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-30 ${
+                        showError ? 'bg-red-500' : (selectedType === TransactionType.Transfer ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-100 dark:shadow-none')
+                    }`}
+                >
+                    {selectedType === TransactionType.Transfer ? 'Update Store Inventory' : 'Process Dispatch'} <ChevronRight size={14} />
+                </button>
+            </div>
+        </div>
+      </div>
     </div>
   );
 };

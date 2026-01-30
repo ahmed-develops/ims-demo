@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Plus, Trash2, Layers, Package } from 'lucide-react';
+import { Plus, Trash2, Layers, Search, Info } from 'lucide-react';
 import { Product } from '../../types';
 
 interface CollectionsViewProps {
@@ -10,13 +10,9 @@ interface CollectionsViewProps {
   onDeleteCollection: (collection: string) => void;
 }
 
-const CollectionsView: React.FC<CollectionsViewProps> = ({
-  collections = [],
-  products = [],
-  onAddCollection,
-  onDeleteCollection
-}) => {
+const CollectionsView: React.FC<CollectionsViewProps> = ({ collections = [], products = [], onAddCollection, onDeleteCollection }) => {
   const [newCollection, setNewCollection] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
 
   const handleAddColl = (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,86 +23,85 @@ const CollectionsView: React.FC<CollectionsViewProps> = ({
     }
   };
 
+  const filteredCollections = collections.filter(c => 
+    c.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   return (
     <div className="p-8 h-full overflow-y-auto bg-gray-50 dark:bg-gray-900 transition-colors duration-200">
-      <div className="max-w-6xl mx-auto">
-        <header className="mb-8">
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Collections Management</h1>
-            <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">Create collections and view associated products.</p>
-        </header>
-
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 mb-8">
-             <div className="flex items-center gap-3 mb-6">
-                <div className="p-2 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-lg">
-                    <Layers size={20} />
-                </div>
-                <div>
-                    <h2 className="text-lg font-bold text-gray-900 dark:text-white">Add New Collection</h2>
-                </div>
+      <div className="max-w-5xl mx-auto space-y-6">
+        <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+                <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Collections Management</h1>
+                <p className="text-sm text-gray-500 dark:text-gray-400">Define product streams and seasonal categories.</p>
             </div>
-             <form onSubmit={handleAddColl} className="flex gap-2 max-w-md">
+            <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
                 <input 
                     type="text"
-                    value={newCollection}
-                    onChange={(e) => setNewCollection(e.target.value)}
-                    placeholder="e.g., Summer 2025"
-                    className="flex-1 px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500 text-gray-900 dark:text-white"
+                    placeholder="Search collections..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-9 pr-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500 w-64 transition-all"
                 />
+            </div>
+        </header>
+
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+             <form onSubmit={handleAddColl} className="flex gap-3">
+                <div className="relative flex-1">
+                    <Layers className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                    <input 
+                        type="text"
+                        maxLength={35}
+                        value={newCollection}
+                        onChange={(e) => setNewCollection(e.target.value)}
+                        placeholder="Enter new collection name (e.g. Summer Eid '25)"
+                        className="w-full pl-10 pr-4 py-2.5 bg-gray-50 dark:bg-gray-700/50 border border-gray-100 dark:border-gray-600 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white transition-all"
+                    />
+                </div>
                 <button 
                     type="submit"
                     disabled={!newCollection.trim()}
-                    className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                    className="px-6 py-2.5 bg-indigo-600 text-white rounded-xl font-bold text-sm hover:bg-indigo-700 disabled:opacity-50 transition-all flex items-center gap-2 shadow-lg shadow-indigo-100 dark:shadow-none"
                 >
                     <Plus size={18} />
-                    <span>Add</span>
+                    <span>Create</span>
                 </button>
             </form>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {collections.map((coll) => {
-                const associatedProducts = products.filter(p => p.category === coll);
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredCollections.map((coll) => {
+                const count = products.filter(p => p.category === coll).length;
                 return (
-                    <div key={coll} className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden shadow-sm flex flex-col h-full">
-                        <div className="p-4 border-b border-gray-100 dark:border-gray-700 flex justify-between items-start bg-gray-50 dark:bg-gray-700/30">
+                    <div key={coll} className="bg-white dark:bg-gray-800 rounded-xl p-5 border border-gray-200 dark:border-gray-700 shadow-sm flex items-center justify-between group hover:border-indigo-300 dark:hover:border-indigo-700 transition-all">
+                        <div className="flex items-center gap-4 min-w-0">
+                            <div className="w-10 h-10 bg-indigo-50 dark:bg-indigo-900/30 rounded-lg flex items-center justify-center text-indigo-600 dark:text-indigo-400 shrink-0">
+                                <Layers size={20} />
+                            </div>
                             <div className="min-w-0">
                                 <h3 className="font-bold text-gray-900 dark:text-white truncate">{coll}</h3>
-                                <p className="text-xs text-gray-500 dark:text-gray-400">{associatedProducts.length} items</p>
+                                <p className="text-xs text-gray-400 dark:text-gray-500 font-medium">{count} Articles</p>
                             </div>
-                            <button 
-                                onClick={() => onDeleteCollection(coll)}
-                                className="text-gray-400 hover:text-red-500 transition-colors p-1"
-                                title="Delete Collection"
-                            >
-                                <Trash2 size={16} />
-                            </button>
                         </div>
-                        
-                        <div className="p-4 flex-1 bg-white dark:bg-gray-800 overflow-y-auto max-h-[200px]">
-                             {associatedProducts.length > 0 ? (
-                                <ul className="space-y-2">
-                                    {associatedProducts.map(p => (
-                                        <li key={p.id} className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-                                            <Package size={14} className="text-indigo-400 shrink-0" />
-                                            <span className="truncate">{p.name}</span>
-                                        </li>
-                                    ))}
-                                </ul>
-                             ) : (
-                                 <div className="h-full flex flex-col items-center justify-center text-gray-400 text-xs italic py-4">
-                                     <span>No items in this collection</span>
-                                 </div>
-                             )}
-                        </div>
+                        <button 
+                            onClick={() => { if(confirm(`Delete collection "${coll}"?`)) onDeleteCollection(coll); }} 
+                            className="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                        >
+                            <Trash2 size={16} />
+                        </button>
                     </div>
                 );
             })}
-            {collections.length === 0 && (
-                <div className="col-span-full py-12 text-center text-gray-400 dark:text-gray-500 italic">
-                    No collections defined. Add one above.
-                </div>
-            )}
         </div>
+
+        {filteredCollections.length === 0 && (
+            <div className="text-center py-20 bg-white dark:bg-gray-800 rounded-2xl border border-dashed border-gray-200 dark:border-gray-700">
+                <Layers size={48} className="mx-auto mb-4 text-gray-200 dark:text-gray-700" />
+                <p className="text-gray-400 dark:text-gray-500 text-sm">No collections found matching your search.</p>
+            </div>
+        )}
       </div>
     </div>
   );
