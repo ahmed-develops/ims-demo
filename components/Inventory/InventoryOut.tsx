@@ -5,6 +5,10 @@ import {
   ShoppingBag, Truck, Gift, Users, Clock, Wand2, ClipboardList
 } from 'lucide-react';
 import ShopifyOrderWizard from './ShopifyOrderWizard';
+import PreOrderWizard from './PreOrderWizard';
+import PRWizard from './PRWizard';
+import FnFWizard from './FnFWizard';
+import StoreTransferWizard from './StoreTransferWizard';
 
 interface InventoryOutProps {
   products: Product[];
@@ -18,6 +22,10 @@ interface InventoryOutProps {
 
 const InventoryOut: React.FC<InventoryOutProps> = ({ products, transactions, onProcessOut }) => {
   const [isShopifyWizardOpen, setIsShopifyWizardOpen] = useState(false);
+  const [isPreOrderWizardOpen, setIsPreOrderWizardOpen] = useState(false);
+  const [isPRWizardOpen, setIsPRWizardOpen] = useState(false);
+  const [isFnFWizardOpen, setIsFnFWizardOpen] = useState(false);
+  const [isTransferWizardOpen, setIsTransferWizardOpen] = useState(false);
 
   const actions = [
     { 
@@ -37,7 +45,8 @@ const InventoryOut: React.FC<InventoryOutProps> = ({ products, transactions, onP
         icon: Truck, 
         color: 'text-emerald-600', 
         bg: 'bg-emerald-50 dark:bg-emerald-900/20', 
-        border: 'border-emerald-100 dark:border-emerald-800' 
+        border: 'border-emerald-100 dark:border-emerald-800',
+        isWizard: true
     },
     { 
         id: TransactionType.PreOrder, 
@@ -46,7 +55,8 @@ const InventoryOut: React.FC<InventoryOutProps> = ({ products, transactions, onP
         icon: Clock, 
         color: 'text-amber-600', 
         bg: 'bg-amber-50 dark:bg-amber-900/20', 
-        border: 'border-amber-100 dark:border-amber-800' 
+        border: 'border-amber-100 dark:border-amber-800',
+        isWizard: true
     },
     { 
         id: TransactionType.PR, 
@@ -55,7 +65,8 @@ const InventoryOut: React.FC<InventoryOutProps> = ({ products, transactions, onP
         icon: Gift, 
         color: 'text-rose-600', 
         bg: 'bg-rose-50 dark:bg-rose-900/20', 
-        border: 'border-rose-100 dark:border-rose-800' 
+        border: 'border-rose-100 dark:border-rose-800',
+        isWizard: true
     },
     { 
         id: TransactionType.FnF, 
@@ -64,9 +75,21 @@ const InventoryOut: React.FC<InventoryOutProps> = ({ products, transactions, onP
         icon: Users, 
         color: 'text-purple-600', 
         bg: 'bg-purple-50 dark:bg-purple-900/20', 
-        border: 'border-purple-100 dark:border-purple-800' 
+        border: 'border-purple-100 dark:border-purple-800',
+        isWizard: true
     },
   ];
+
+  const getWizardBadgeColor = (id: TransactionType) => {
+    switch(id) {
+        case TransactionType.Shopify: return 'bg-blue-600 shadow-blue-100';
+        case TransactionType.PreOrder: return 'bg-amber-500 shadow-amber-100';
+        case TransactionType.PR: return 'bg-rose-500 shadow-rose-100';
+        case TransactionType.FnF: return 'bg-purple-600 shadow-purple-100';
+        case TransactionType.Transfer: return 'bg-emerald-600 shadow-emerald-100';
+        default: return 'bg-indigo-600';
+    }
+  };
 
   return (
     <div className="h-full overflow-y-auto bg-gray-50 dark:bg-gray-950 transition-colors duration-200">
@@ -82,12 +105,11 @@ const InventoryOut: React.FC<InventoryOutProps> = ({ products, transactions, onP
                 <button
                     key={act.id}
                     onClick={() => {
-                        if (act.isWizard) {
-                            setIsShopifyWizardOpen(true);
-                        } else {
-                            // Logic for other modules will be implemented later
-                            console.log(`Module ${act.id} clicked`);
-                        }
+                        if (act.id === TransactionType.Shopify) setIsShopifyWizardOpen(true);
+                        else if (act.id === TransactionType.PreOrder) setIsPreOrderWizardOpen(true);
+                        else if (act.id === TransactionType.PR) setIsPRWizardOpen(true);
+                        else if (act.id === TransactionType.FnF) setIsFnFWizardOpen(true);
+                        else if (act.id === TransactionType.Transfer) setIsTransferWizardOpen(true);
                     }}
                     className={`group relative flex flex-col items-start p-8 rounded-[2.5rem] border-2 bg-white dark:bg-gray-900 shadow-sm transition-all duration-300 hover:shadow-2xl hover:-translate-y-1 active:scale-95 text-left border-gray-100 dark:border-gray-800 hover:border-indigo-500/20`}
                 >
@@ -101,7 +123,7 @@ const InventoryOut: React.FC<InventoryOutProps> = ({ products, transactions, onP
                     </div>
                     
                     {act.isWizard && (
-                        <div className="absolute top-6 right-6 flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-600 text-white text-[8px] font-black uppercase tracking-widest shadow-lg shadow-blue-100 dark:shadow-none animate-pulse">
+                        <div className={`absolute top-6 right-6 flex items-center gap-1.5 px-3 py-1 rounded-full text-white text-[8px] font-black uppercase tracking-widest shadow-lg animate-pulse ${getWizardBadgeColor(act.id)}`}>
                             <Wand2 size={10} />
                             Wizard
                         </div>
@@ -140,6 +162,58 @@ const InventoryOut: React.FC<InventoryOutProps> = ({ products, transactions, onP
                 TransactionType.Shopify, 
                 res.items.map(i => ({ productId: i.product.id, sizeInternal: i.size.sizeInternal, quantity: i.quantity })),
                 { orderId: res.details.orderId, recipient: res.details.recipient, discount: 0 }
+            );
+        }}
+      />
+
+      <PreOrderWizard 
+        isOpen={isPreOrderWizardOpen} 
+        onClose={() => setIsPreOrderWizardOpen(false)}
+        products={products}
+        onComplete={(res) => {
+            onProcessOut(
+                TransactionType.PreOrder, 
+                res.items.map(i => ({ productId: i.product.id, sizeInternal: i.size.sizeInternal, quantity: i.quantity })),
+                { recipient: res.details.customerName, discount: 0 }
+            );
+        }}
+      />
+
+      <PRWizard 
+        isOpen={isPRWizardOpen} 
+        onClose={() => setIsPRWizardOpen(false)}
+        products={products}
+        onComplete={(res) => {
+            onProcessOut(
+                TransactionType.PR, 
+                res.items.map(i => ({ productId: i.product.id, sizeInternal: i.size.sizeInternal, quantity: i.quantity })),
+                { recipient: res.details.recipientName, discount: 100 }
+            );
+        }}
+      />
+
+      <FnFWizard 
+        isOpen={isFnFWizardOpen} 
+        onClose={() => setIsFnFWizardOpen(false)}
+        products={products}
+        onComplete={(res) => {
+            onProcessOut(
+                TransactionType.FnF, 
+                res.items.map(i => ({ productId: i.product.id, sizeInternal: i.size.sizeInternal, quantity: i.quantity })),
+                { recipient: res.details.customerName, discount: res.details.discount }
+            );
+        }}
+      />
+
+      <StoreTransferWizard 
+        isOpen={isTransferWizardOpen} 
+        onClose={() => setIsTransferWizardOpen(false)}
+        products={products}
+        onComplete={(res) => {
+            onProcessOut(
+                TransactionType.Transfer, 
+                res.items.map(i => ({ productId: i.product.id, sizeInternal: i.size.sizeInternal, quantity: i.quantity })),
+                { recipient: res.details.recipient, discount: 0 }
             );
         }}
       />
