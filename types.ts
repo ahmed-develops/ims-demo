@@ -1,5 +1,4 @@
 
-
 export enum Collection {
   All = 'All',
   WinterEditII = 'Winter Edit II',
@@ -31,7 +30,6 @@ export interface Product {
   color?: string;
   parts?: string[];
   createdAt: string; 
-  // Added brand property to match existing usage and fix constants.ts errors
   brand?: string;
 }
 
@@ -107,11 +105,15 @@ export interface Transaction {
   shift: 'Morning' | 'Night';
   businessDate: string;
   cashierName: string;
+  cashierRole?: UserRole; 
+  locationSource?: string; 
+  locationDestination?: string; 
   orderDiscount?: number;
   externalOrderId?: string;
   recipientName?: string;
   notes?: string;
   originalTransactionId?: string;
+  isReturned?: boolean;
 }
 
 export interface AuditLog {
@@ -161,4 +163,11 @@ export enum ViewState {
 export interface ChatMessage {
   role: 'user' | 'model';
   text: string;
+}
+
+export interface ToastMessage {
+  id: string;
+  type: 'success' | 'error' | 'info' | 'warning';
+  title: string;
+  message: string;
 }

@@ -1,14 +1,15 @@
 
 import React from 'react';
-import { Transaction } from '../../types';
+import { Transaction, ToastMessage } from '../../types';
 import { Check, Printer, X, AlertTriangle } from 'lucide-react';
 
 interface ReceiptModalProps {
   transaction: Transaction | null;
   onClose: () => void;
+  addToast: (type: ToastMessage['type'], title: string, message: string) => void;
 }
 
-const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, onClose }) => {
+const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, onClose, addToast }) => {
   if (!transaction) return null;
 
   const itemSubtotal = (transaction.items || []).reduce((acc, item) => {
@@ -22,7 +23,7 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, onClose }) => 
   const handlePrint = () => {
     const printWindow = window.open('', '_blank', 'width=800,height=600');
     if (!printWindow) {
-      alert("Please allow popups to generate receipts.");
+      addToast('error', 'Popup Blocked', 'Please enable popups to generate receipts');
       return;
     }
 

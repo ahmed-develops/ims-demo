@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import { Search, Eye, Calendar, DollarSign, RotateCcw, Download, Printer } from 'lucide-react';
 import { Transaction, TransactionType } from '../../types';
@@ -82,9 +81,16 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, onViewR
                                 <div className="text-[9px] font-mono font-bold text-indigo-500 mt-0.5 uppercase">ID: {t.id}</div>
                             </td>
                             <td className="p-6">
-                                <span className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest ${t.type === TransactionType.Return ? 'bg-red-50 text-red-500 border border-red-100' : 'bg-gray-50 text-gray-400 border border-gray-100'}`}>
-                                    {t.type}
-                                </span>
+                                <div className="flex flex-col gap-1 items-start">
+                                    <span className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest ${t.type === TransactionType.Return ? 'bg-red-50 text-red-500 border border-red-100' : 'bg-gray-50 text-gray-400 border border-gray-100'}`}>
+                                        {t.type}
+                                    </span>
+                                    {t.isReturned && (
+                                        <span className="px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest bg-amber-50 text-amber-600 border border-amber-100">
+                                            Returned
+                                        </span>
+                                    )}
+                                </div>
                             </td>
                             <td className="p-6 text-[11px] font-bold dark:text-gray-300 uppercase tracking-tighter">
                                 {t.customer?.name || t.recipientName || 'Walk-in Guest'}
@@ -95,7 +101,7 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, onViewR
                             <td className="p-6 text-center">
                                 <div className="flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-all">
                                     <button onClick={() => onViewReceipt(t)} className="p-2 text-gray-400 hover:text-indigo-600 transition-all"><Eye size={18} /></button>
-                                    {t.type === TransactionType.Sale && onReturn && (
+                                    {t.type === TransactionType.Sale && onReturn && !t.isReturned && (
                                         <button onClick={() => onReturn(t)} className="p-2 text-gray-400 hover:text-red-500 transition-all" title="Return/Exchange"><RotateCcw size={18} /></button>
                                     )}
                                 </div>

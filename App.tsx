@@ -23,7 +23,8 @@ import EndShiftModal from './components/Shift/EndShiftModal';
 import AuditLogsView from './components/Admin/AuditLogsView';
 import BackupExportView from './components/Admin/BackupExportView';
 import ConfirmationModal from './components/UI/ConfirmationModal';
-import { ViewState, Product, ProductSize, CartItem, Transaction, Customer, SessionInfo, Collection, ShiftRecord, CashierUser, UserRole, TransactionType, AuditLog, StockMovement, StockMovementType } from './types';
+import { ToastContainer } from './components/UI/Toast';
+import { ViewState, Product, ProductSize, CartItem, Transaction, Customer, SessionInfo, Collection, ShiftRecord, CashierUser, UserRole, TransactionType, AuditLog, StockMovement, StockMovementType, ToastMessage } from './types';
 import { PRODUCTS, SHIFT_HISTORY, USERS } from './constants';
 import { getShiftDetails } from './utils';
 import { LayoutDashboard, ShoppingCart, Archive, Users, Layers, TrendingUp, Truck, FileText, ClipboardList, Database, Barcode, History, RotateCcw } from 'lucide-react';
@@ -42,6 +43,7 @@ const App: React.FC = () => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [stockMovements, setStockMovements] = useState<StockMovement[]>([]);
   const [shiftHistory, setShiftHistory] = useState<ShiftRecord[]>(SHIFT_HISTORY);
+  const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [collections, setCollections] = useState<string[]>([
     Collection.WinterEditII,
     Collection.WinterFormals,
@@ -57,7 +59,6 @@ const App: React.FC = () => {
   const [pendingCheckout, setPendingCheckout] = useState<{ amountPaid: number; balance: number; isPartial: boolean; cashReceived: number; changeAmount: number } | null>(null);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
 
-  // Confirmation Modal States
   const [returnTxnPending, setReturnTxnPending] = useState<Transaction | null>(null);
 
   useEffect(() => {
@@ -66,6 +67,15 @@ const App: React.FC = () => {
   }, [isDarkMode]);
 
   const toggleTheme = () => setIsDarkMode(!isDarkMode);
+
+  const addToast = useCallback((type: ToastMessage['type'], title: string, message: string) => {
+    const id = Math.random().toString(36).substr(2, 9);
+    setToasts(prev => [...prev, { id, type, title, message }]);
+  }, []);
+
+  const removeToast = useCallback((id: string) => {
+    setToasts(prev => prev.filter(t => t.id !== id));
+  }, []);
 
   const addAuditLog = useCallback((action: string, details: string) => {
     const log: AuditLog = {
@@ -85,7 +95,7 @@ const App: React.FC = () => {
     type: StockMovementType, 
     qtyChange: number,
     newStore: number,
-    newWh: number,
+    newWhStock: number,
     notes?: string
   ) => {
     const movement: StockMovement = {
@@ -98,7 +108,7 @@ const App: React.FC = () => {
       location: type === StockMovementType.Transfer ? 'Both' : (newStore !== -1 ? 'Store' : 'Warehouse'),
       quantityChange: qtyChange,
       newStoreStock: newStore,
-      newWhStock: newWh,
+      newWhStock: newWhStock,
       performedBy: currentUser || 'System',
       notes
     };
@@ -158,6 +168,7 @@ const App: React.FC = () => {
     setCurrentUserRole(user.role);
     setIsAuthenticated(true);
     addAuditLog('Login', `User ${user.username} logged in as ${user.role}`);
+    addToast('success', 'Access Authorized', `Logged in as ${user.fullName}`);
     
     if (user.role === 'Admin' || user.role === 'Viewer') setCurrentView(ViewState.Reports);
     else if (user.role === 'Warehouse') setCurrentView(ViewState.Inventory);
@@ -166,6 +177,7 @@ const App: React.FC = () => {
 
   const handleLogout = () => {
     addAuditLog('Logout', `User ${currentUser} logged out`);
+    addToast('info', 'Session Ended', 'Logged out successfully');
     setSessionInfo(null);
     setCurrentUser('');
     setCurrentUserRole(null);
@@ -179,6 +191,7 @@ const App: React.FC = () => {
     const { shift, businessDate } = getShiftDetails(now);
     setSessionInfo({ startTime: now, shift, businessDate, cashierName: currentUser });
     addAuditLog('Start Shift', `${shift} shift started on ${businessDate.toDateString()}`);
+    addToast('success', 'Shift Started', `${shift} shift is now active`);
   };
 
   const confirmEndShift = () => {
@@ -243,11 +256,15 @@ const App: React.FC = () => {
       shift: sessionInfo.shift,
       businessDate: sessionInfo.businessDate.toISOString().split('T')[0],
       cashierName: sessionInfo.cashierName,
+      cashierRole: currentUserRole || 'Cashier',
+      locationSource: 'Retail Store',
+      locationDestination: 'Direct Sale',
       orderDiscount
     };
 
     setTransactions(prev => [txn, ...prev]);
     addAuditLog('Sale', `Transaction ${txn.id} completed. Amount: ₨ ${total}`);
+    addToast('success', 'Sale Processed', `Order #${txn.id} confirmed`);
     setLastTransaction(txn);
     setCart([]);
     setSelectedCustomer(null);
@@ -284,8 +301,13 @@ const App: React.FC = () => {
         notes: `Customer return from #${txn.id}`
     };
 
-    setTransactions(prev => [returnTxn, ...prev]);
+    setTransactions(prev => {
+        const updated = prev.map(t => t.id === txn.id ? { ...t, isReturned: true } : t);
+        return [returnTxn, ...updated];
+    });
+    
     addAuditLog('Return', `Transaction #${txn.id} was returned.`);
+    addToast('warning', 'Return Processed', `Stock levels adjusted for ${txn.id}`);
     setReturnTxnPending(null);
   };
 
@@ -300,7 +322,10 @@ const App: React.FC = () => {
         const newQty = Math.max(0, item.quantity + delta);
         const prod = products.find(p => p.id === productId);
         const sizeObj = prod?.sizes.find(s => s.sizeInternal === sizeInternal);
-        if (sizeObj && newQty > sizeObj.stock) return item;
+        if (sizeObj && newQty > sizeObj.stock) {
+           addToast('error', 'Inventory Limit', 'Cannot exceed available store stock');
+           return item;
+        }
         return { ...item, quantity: newQty };
       }
       return item;
@@ -308,13 +333,20 @@ const App: React.FC = () => {
   };
 
   const addToCart = (product: Product, selectedSize: ProductSize) => {
-    if (selectedSize.stock <= 0) return;
+    if (selectedSize.stock <= 0) {
+        addToast('error', 'Out of Stock', `${product.name} (${selectedSize.size}) is not available`);
+        return;
+    }
     setCart(prev => {
       const existing = prev.find(item => item.id === product.id && item.selectedSize.sizeInternal === selectedSize.sizeInternal);
       if (existing) {
-        if (existing.quantity >= selectedSize.stock) return prev;
+        if (existing.quantity >= selectedSize.stock) {
+            addToast('error', 'Inventory Limit', 'All available units are already in cart');
+            return prev;
+        }
         return prev.map(item => (item.id === product.id && item.selectedSize.sizeInternal === selectedSize.sizeInternal) ? { ...item, quantity: item.quantity + 1 } : item);
       }
+      addToast('info', 'Item Added', `${product.name} added to cart`);
       return [...prev, { ...product, selectedSize, quantity: 1 }];
     });
   };
@@ -337,7 +369,7 @@ const App: React.FC = () => {
                 orderDiscount={orderDiscount}
                 setOrderDiscount={setOrderDiscount}
                 onSelectCustomer={setSelectedCustomer}
-                onAddCustomer={c => { setCustomers([...customers, c]); addAuditLog('Customer Created', `Added ${c.name}`); }}
+                onAddCustomer={c => { setCustomers([...customers, c]); addAuditLog('Customer Created', `Added ${c.name}`); addToast('success', 'CRM Updated', `New profile: ${c.name}`); }}
                 onUpdateQuantity={updateQuantity}
                 onRemoveItem={(pid, sid) => setCart(prev => prev.filter(item => !(item.id === pid && item.selectedSize.sizeInternal === sid)))}
                 onCheckout={handleCheckoutInit}
@@ -347,10 +379,9 @@ const App: React.FC = () => {
           </div>
         );
       case ViewState.Inventory:
-        return <InventoryList products={products} onAddProduct={p => { setProducts([p, ...products]); addAuditLog('Product Added', p.id); }} onEditProduct={p => setProducts(products.map(x => x.id === p.id ? p : x))} onDeleteProduct={id => setProducts(products.filter(x => x.id !== id))} lowStockThreshold={lowStockThreshold} onUpdateThreshold={setLowStockThreshold} collections={collections} currentUserRole={currentUserRole} />;
+        return <InventoryList products={products} onAddProduct={p => { setProducts([p, ...products]); addAuditLog('Product Added', p.id); addToast('success', 'Article Created', `SKU ${p.id} initialized`); }} onEditProduct={p => setProducts(products.map(x => x.id === p.id ? p : x))} onDeleteProduct={id => setProducts(products.filter(x => x.id !== id))} lowStockThreshold={lowStockThreshold} onUpdateThreshold={setLowStockThreshold} collections={collections} currentUserRole={currentUserRole} />;
       case ViewState.InventoryOut:
         return <InventoryOut products={products} transactions={transactions} onProcessOut={(type, items, details) => { 
-            // Handle multiple items/variants in a single logistical movement
             setProducts(prev => prev.map(p => {
                 const productUpdates = items.filter(i => i.productId === p.id);
                 if (productUpdates.length > 0) {
@@ -378,6 +409,9 @@ const App: React.FC = () => {
             const subtotal = txItems.reduce((acc, item) => acc + (item.price * item.quantity), 0);
             const total = subtotal * (1 - (details.discount || 0) / 100);
 
+            let locDest = details.recipient || 'Logistics Partner';
+            if (type === TransactionType.Transfer) locDest = 'Retail Store';
+
             const distTxn: Transaction = {
                 id: `MV-${Math.random().toString(36).substr(2, 5).toUpperCase()}`,
                 date: new Date(),
@@ -392,19 +426,23 @@ const App: React.FC = () => {
                 shift: 'Morning',
                 businessDate: new Date().toISOString().split('T')[0],
                 cashierName: currentUser,
+                cashierRole: currentUserRole || 'Warehouse',
+                locationSource: 'Warehouse',
+                locationDestination: locDest,
                 recipientName: details.recipient,
                 externalOrderId: details.orderId,
                 orderDiscount: details.discount
             };
 
             setTransactions(prev => [distTxn, ...prev]);
-            setLastDistribution(distTxn); // Trigger Movement Receipt
+            setLastDistribution(distTxn); 
             addAuditLog('Inventory Out', `Logistics Release: ${items.length} variants. ID: ${distTxn.id}`);
+            addToast('success', 'Logistics Finalized', `Gate pass ${distTxn.id} generated`);
         }} />;
       case ViewState.StockTrack:
         return <StockTrackView movements={stockMovements} userRole={currentUserRole} />;
       case ViewState.Barcodes:
-        return <BarcodeDirectory products={products} onUpdateProduct={p => setProducts(products.map(x => x.id === p.id ? p : x))} collections={collections} brands={[]} userRole={currentUserRole} />;
+        return <BarcodeDirectory products={products} onUpdateProduct={p => setProducts(products.map(x => x.id === p.id ? p : x))} collections={collections} brands={[]} userRole={currentUserRole} addToast={addToast} />;
       case ViewState.StockReport:
         return <StockReport products={products} collections={collections} movements={stockMovements} userRole={currentUserRole} />;
       case ViewState.Transactions:
@@ -412,7 +450,7 @@ const App: React.FC = () => {
       case ViewState.Customers:
         return <CustomerList customers={customers} onAddCustomer={c => setCustomers([...customers, c])} onEditCustomer={c => setCustomers(customers.map(x => x.id === c.id ? c : x))} onDeleteCustomer={id => setCustomers(customers.filter(x => x.id !== id))} transactions={transactions} userRole={currentUserRole} />;
       case ViewState.Reports:
-        return <ReportsDashboard shiftHistory={shiftHistory} transactions={transactions} products={products} movements={stockMovements} />;
+        return <ReportsDashboard transactions={transactions} products={products} movements={stockMovements} />;
       case ViewState.CashierManagement:
         return <CashierDashboard shiftHistory={shiftHistory} users={users} onAddUser={u => setUsers([...users, u])} onEditUser={u => setUsers(users.map(x => x.id === u.id ? u : x))} onDeleteUser={id => setUsers(users.filter(x => x.id !== id))} currentUserRole={currentUserRole} />;
       case ViewState.AuditLogs:
@@ -444,9 +482,10 @@ const App: React.FC = () => {
         {renderContent()}
       </Layout>
       <AIAssistant products={products} />
+      <ToastContainer toasts={toasts} onRemove={removeToast} />
       <PaymentModal isOpen={isPaymentModalOpen} total={pendingCheckout?.amountPaid || 0} onClose={() => setIsPaymentModalOpen(false)} onConfirm={handlePaymentConfirm} />
-      <ReceiptModal transaction={lastTransaction} onClose={() => setLastTransaction(null)} />
-      <DistributionReceiptModal transaction={lastDistribution} onClose={() => setLastDistribution(null)} />
+      <ReceiptModal transaction={lastTransaction} onClose={() => setLastTransaction(null)} addToast={addToast} />
+      <DistributionReceiptModal transaction={lastDistribution} onClose={() => setLastDistribution(null)} addToast={addToast} />
       <ConfirmationModal
         isOpen={!!returnTxnPending}
         onClose={() => setReturnTxnPending(null)}

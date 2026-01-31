@@ -1,6 +1,6 @@
 
-import React, { useState, useEffect } from 'react';
-import { X, Package, Palette, Check, ChevronRight, ChevronLeft, Store, Archive, AlertCircle, Info, Layers, Tag, Sparkles } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { X, Package, Palette, Check, ChevronRight, ChevronLeft, Store, Archive, AlertCircle, Info, Layers, Tag, Sparkles, Upload, Image as ImageIcon, Trash2 } from 'lucide-react';
 import { Product, UserRole, ProductSize } from '../../types';
 
 interface ProductModalProps {
@@ -34,6 +34,7 @@ const ProductModal: React.FC<ProductModalProps> = ({
 }) => {
   const [step, setStep] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [selectedSizes, setSelectedSizes] = useState<string[]>([]); 
   const [variantStocks, setVariantStocks] = useState<Record<string, { store: string; wh: string }>>({});
@@ -50,7 +51,8 @@ const ProductModal: React.FC<ProductModalProps> = ({
   });
 
   const isEditMode = !!product;
-  const isStoreLocked = userRole === 'Warehouse';
+  // Warehouse managers are no longer locked out of store stock in the inventory engine module
+  const isStoreLocked = userRole === 'Viewer'; 
 
   useEffect(() => {
     if (isOpen) {
@@ -96,6 +98,27 @@ const ProductModal: React.FC<ProductModalProps> = ({
   }, [isOpen, product, prefilledSku]);
 
   if (!isOpen) return null;
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 2 * 1024 * 1024) {
+        setError("Image size exceeds 2MB limit.");
+        return;
+      }
+      
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFormData(prev => ({ ...prev, image: reader.result as string }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const clearImage = () => {
+    setFormData(prev => ({ ...prev, image: '' }));
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
 
   const handleToggleSize = (internal: string) => {
     if (selectedSizes.includes(internal)) {
@@ -213,6 +236,49 @@ const ProductModal: React.FC<ProductModalProps> = ({
 
             {step === 0 && (
                 <div className="space-y-6 animate-in fade-in duration-300">
+                    {/* Image Upload Section */}
+                    <div className="flex flex-col items-center justify-center mb-8">
+                        <div className="relative group">
+                            <div className={`w-40 h-40 rounded-3xl overflow-hidden bg-gray-50 dark:bg-gray-800 border-2 border-dashed transition-all flex items-center justify-center ${formData.image ? 'border-indigo-500 shadow-xl' : 'border-gray-200 dark:border-gray-700'}`}>
+                                {formData.image ? (
+                                    <img src={formData.image} className="w-full h-full object-cover" alt="Preview" />
+                                ) : (
+                                    <div className="flex flex-col items-center gap-2 text-gray-400">
+                                        <ImageIcon size={40} strokeWidth={1.5} />
+                                        <span className="text-[10px] font-black uppercase tracking-widest">No Image</span>
+                                    </div>
+                                )}
+                                
+                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                                    <button 
+                                        type="button"
+                                        onClick={() => fileInputRef.current?.click()}
+                                        className="p-3 bg-white text-indigo-600 rounded-2xl hover:scale-110 transition-transform shadow-lg"
+                                    >
+                                        <Upload size={20} />
+                                    </button>
+                                    {formData.image && (
+                                        <button 
+                                            type="button"
+                                            onClick={clearImage}
+                                            className="p-3 bg-rose-500 text-white rounded-2xl hover:scale-110 transition-transform shadow-lg"
+                                        >
+                                            <Trash2 size={20} />
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                        <input 
+                            ref={fileInputRef}
+                            type="file" 
+                            accept="image/*" 
+                            className="hidden" 
+                            onChange={handleImageChange} 
+                        />
+                        <p className="mt-3 text-[9px] font-black text-gray-400 uppercase tracking-[0.2em]">Click to upload article photo (Max 2MB)</p>
+                    </div>
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="space-y-1">
                             <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Article SKU *</label>
@@ -254,6 +320,12 @@ const ProductModal: React.FC<ProductModalProps> = ({
                     <div className="space-y-1">
                         <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Product Description</label>
                         <textarea name="description" value={formData.description} onChange={handleChange} rows={4} className="w-full px-5 py-3 bg-gray-50 dark:bg-gray-800 rounded-xl text-sm border-none outline-none resize-none" placeholder="Styling notes..." />
+                    </div>
+                    {/* Fallback image URL input if upload isn't used */}
+                    <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Or External Image URL</label>
+                        <input name="image" value={formData.image.startsWith('data:') ? '' : formData.image} onChange={handleChange} className="w-full px-5 py-3 bg-gray-50 dark:bg-gray-800 rounded-xl text-sm border-none outline-none" placeholder="https://..." />
+                        <p className="text-[8px] text-gray-400 mt-1 uppercase tracking-tighter">Manual URL entry. Note: Uploading a file overrides this.</p>
                     </div>
                 </div>
             )}
@@ -300,7 +372,7 @@ const ProductModal: React.FC<ProductModalProps> = ({
         </div>
 
         <div className="p-6 border-t border-gray-100 dark:border-gray-800 shrink-0 flex gap-4">
-            <button type="button" onClick={step === 0 ? onClose : handleBack} className="flex-1 py-3 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 rounded-xl font-bold text-sm uppercase tracking-widest transition-all">
+            <button type="button" onClick={step === 0 ? onClose : handleBack} className="flex-1 py-3 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-200 rounded-xl font-bold text-sm uppercase tracking-widest transition-all">
                 {step === 0 ? 'Cancel' : 'Previous'}
             </button>
             <button type="button" onClick={step === 2 ? handleSubmit : handleNext} className="flex-1 py-3 bg-indigo-600 text-white rounded-xl font-bold text-sm uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-100 dark:shadow-none">

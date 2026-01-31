@@ -119,7 +119,7 @@ const ReportsDashboard: React.FC<ReportsDashboardProps> = ({ transactions, produ
             <p style="font-size: 32px; font-weight: 900; margin: 0;">₨ ${stats.shopifyRevenue.toLocaleString()}</p>
           </div>
           <div style="background: #f8fafc; padding: 25px; border-radius: 15px; border: 1px solid #e2e8f0;">
-            <p style="font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase; margin-bottom: 5px;">Store Floor Assets</p>
+            <p style="font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase; margin-bottom: 5px;">Retail Store Assets</p>
             <p style="font-size: 32px; font-weight: 900; margin: 0;">${stats.totalStoreStock} Units</p>
           </div>
           <div style="background: #f8fafc; padding: 25px; border-radius: 15px; border: 1px solid #e2e8f0;">
@@ -225,7 +225,7 @@ const ReportsDashboard: React.FC<ReportsDashboardProps> = ({ transactions, produ
                     <div className="space-y-8">
                         <div>
                             <div className="flex justify-between items-end mb-3">
-                                <span className="text-[10px] font-black uppercase tracking-widest text-gray-500">Retail Floor Concentration</span>
+                                <span className="text-[10px] font-black uppercase tracking-widest text-gray-500">Retail Store Concentration</span>
                                 <span className="text-sm font-black dark:text-white">
                                   {stats.availableUnits > 0 ? ((stats.totalStoreStock / stats.availableUnits) * 100).toFixed(1) : 0}%
                                 </span>

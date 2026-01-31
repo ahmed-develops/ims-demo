@@ -65,7 +65,8 @@ const StockUpdateModal: React.FC<StockUpdateModalProps> = ({
     ? [{ size: product.sizes[sizeIndex], originalIndex: sizeIndex }] 
     : product.sizes.map((s, i) => ({ size: s, originalIndex: i }));
 
-  const isStoreLocked = userRole === 'Warehouse';
+  // Warehouse role is now granted full rights in the inventory engine module
+  const isStoreLocked = userRole === 'Viewer';
 
   return (
     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200">
@@ -88,10 +89,10 @@ const StockUpdateModal: React.FC<StockUpdateModalProps> = ({
         </div>
 
         <div className="p-6 space-y-6 max-h-[60vh] overflow-y-auto">
-            {isStoreLocked && (
+            {userRole === 'Viewer' && (
                 <div className="flex items-center gap-2 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800 rounded-lg text-amber-700 dark:text-amber-400 text-xs">
                     <Lock size={14} className="shrink-0" />
-                    <p>As a Warehouse Manager, you can only update Warehouse stock. Store quantities are locked.</p>
+                    <p>Viewer role: Stocks are read-only.</p>
                 </div>
             )}
 
@@ -123,13 +124,18 @@ const StockUpdateModal: React.FC<StockUpdateModalProps> = ({
                             </div>
                             <div>
                                 <label className="block text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase mb-1 flex items-center gap-1">
-                                    <Archive size={10} /> Wh Qty
+                                    <Archive size={10} /> Wh Qty {isStoreLocked && <Lock size={8} />}
                                 </label>
                                 <input 
+                                    disabled={isStoreLocked}
                                     type="number"
                                     value={localInputStocks[originalIndex]?.warehouseStock || ''}
                                     onChange={(e) => handleUpdateStock(originalIndex, 'warehouseStock', e.target.value)}
-                                    className="w-full px-3 py-2 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800 rounded-lg text-sm text-indigo-700 dark:text-indigo-300 focus:ring-2 focus:ring-indigo-500 outline-none"
+                                    className={`w-full px-3 py-2 border rounded-lg text-sm outline-none transition-all ${
+                                        isStoreLocked 
+                                        ? 'bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-400 cursor-not-allowed opacity-60' 
+                                        : 'bg-indigo-50 dark:bg-indigo-900/20 border-indigo-100 dark:border-indigo-800 rounded-lg text-indigo-700 dark:text-indigo-300 focus:ring-2 focus:ring-indigo-500 outline-none'
+                                    }`}
                                 />
                             </div>
                         </div>
@@ -147,8 +153,9 @@ const StockUpdateModal: React.FC<StockUpdateModalProps> = ({
         <div className="p-6 border-t border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 flex gap-3">
             <button onClick={onClose} className="flex-1 py-3 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-xl font-bold hover:bg-gray-300 transition-colors">Cancel</button>
             <button 
+                disabled={isStoreLocked}
                 onClick={handleConfirm}
-                className="flex-1 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 dark:shadow-none flex items-center justify-center gap-2"
+                className="flex-1 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 dark:shadow-none flex items-center justify-center gap-2 disabled:opacity-50"
             >
                 <Save size={18} />
                 Save Changes

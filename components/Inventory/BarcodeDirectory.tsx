@@ -1,7 +1,8 @@
 
 import React, { useState } from 'react';
 import { Search, Printer, Barcode as BarcodeIcon, ChevronDown, ChevronUp, Tag, RefreshCw, Save, Edit3, Wand2 } from 'lucide-react';
-import { Product, UserRole, ProductSize } from '../../types';
+import { Product, UserRole, ProductSize, ToastMessage } from '../../types';
+import ConfirmationModal from '../UI/ConfirmationModal';
 
 interface BarcodeDirectoryProps {
   products: Product[];
@@ -9,6 +10,7 @@ interface BarcodeDirectoryProps {
   collections: string[];
   brands: string[];
   userRole: UserRole | null;
+  addToast: (type: ToastMessage['type'], title: string, message: string) => void;
 }
 
 const BarcodeDirectory: React.FC<BarcodeDirectoryProps> = ({ 
@@ -16,11 +18,13 @@ const BarcodeDirectory: React.FC<BarcodeDirectoryProps> = ({
   onUpdateProduct, 
   collections, 
   brands, 
-  userRole 
+  userRole,
+  addToast
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedProductIds, setExpandedProductIds] = useState<Set<string>>(new Set());
   const [editingBarcode, setEditingBarcode] = useState<{ productId: string, sizeInternal: string, value: string } | null>(null);
+  const [pendingBulkGenerate, setPendingBulkGenerate] = useState<Product | null>(null);
 
   const isReadOnly = userRole === 'Viewer';
 
@@ -44,7 +48,6 @@ const BarcodeDirectory: React.FC<BarcodeDirectoryProps> = ({
   };
 
   const generateUniqueBarcode = (sku: string, size: string) => {
-    // Standardized generation logic: NM + SKU (cleaned) + SIZE + Random Hex
     const cleanSku = sku.replace(/[^a-zA-Z0-9]/g, '').slice(0, 5);
     const timestamp = Date.now().toString(36).toUpperCase().slice(-4);
     return `NM-${cleanSku}-${size}-${timestamp}`;
@@ -56,23 +59,25 @@ const BarcodeDirectory: React.FC<BarcodeDirectoryProps> = ({
     );
     onUpdateProduct({ ...product, sizes: updatedSizes });
     setEditingBarcode(null);
+    addToast('success', 'Identity Updated', `Barcode for ${product.id} variant saved`);
   };
 
-  const handleAutoGenerateAll = (product: Product) => {
-    if (isReadOnly) return;
-    if (!confirm(`Generate new unique barcodes for all variants of ${product.id}?`)) return;
-
+  const finalizeBulkGenerate = () => {
+    if (!pendingBulkGenerate || isReadOnly) return;
+    const product = pendingBulkGenerate;
     const updatedSizes = product.sizes.map(s => ({
       ...s,
       barcode: generateUniqueBarcode(product.id, s.sizeInternal)
     }));
     onUpdateProduct({ ...product, sizes: updatedSizes });
+    setPendingBulkGenerate(null);
+    addToast('success', 'Bulk Generation Complete', `Refreshed ${updatedSizes.length} variants for ${product.id}`);
   };
 
   const handlePrintAll = () => {
     const printWindow = window.open('', '_blank', 'width=1200,height=800');
     if (!printWindow) {
-      alert("Popup blocked. Please allow popups to generate barcodes.");
+      addToast('error', 'Print Blocked', 'Please enable popups to generate barcode PDF');
       return;
     }
 
@@ -170,6 +175,8 @@ const BarcodeDirectory: React.FC<BarcodeDirectoryProps> = ({
             </html>
         `);
         win.document.close();
+    } else {
+        addToast('error', 'Print Blocked', 'Please enable popups for thermal label printing');
     }
   };
 
@@ -234,7 +241,7 @@ const BarcodeDirectory: React.FC<BarcodeDirectoryProps> = ({
                              <div className="flex items-center gap-4">
                                 {!isReadOnly && (
                                   <button 
-                                    onClick={(e) => { e.stopPropagation(); handleAutoGenerateAll(product); }}
+                                    onClick={(e) => { e.stopPropagation(); setPendingBulkGenerate(product); }}
                                     className="p-2.5 bg-gray-50 dark:bg-gray-700 text-gray-500 hover:text-indigo-600 rounded-xl transition-all flex items-center gap-2 group/btn"
                                     title="Auto-Generate Barcodes for all Variants"
                                   >
@@ -332,6 +339,16 @@ const BarcodeDirectory: React.FC<BarcodeDirectoryProps> = ({
             })}
         </div>
       </div>
+
+      <ConfirmationModal
+        isOpen={!!pendingBulkGenerate}
+        onClose={() => setPendingBulkGenerate(null)}
+        onConfirm={finalizeBulkGenerate}
+        title="Refresh Article Serials?"
+        message={`This will overwrite all existing barcodes for "${pendingBulkGenerate?.id}" with newly generated unique IDs. This action is logged for audit.`}
+        confirmText="Generate All"
+        type="warning"
+      />
     </div>
   );
 };

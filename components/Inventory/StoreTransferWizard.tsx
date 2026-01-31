@@ -201,7 +201,7 @@ const StoreTransferWizard: React.FC<StoreTransferWizardProps> = ({ isOpen, onClo
                     </div>
                     <div className="space-y-0.5">
                         <h4 className="text-sm font-black text-gray-900 dark:text-white uppercase tracking-tight">Pick Transfer Stock</h4>
-                        <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest">Move WH reserve to retail floor</p>
+                        <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest">Move WH reserve to store stock</p>
                     </div>
                     <form onSubmit={handleScanForm} className="max-w-[300px] mx-auto">
                         <input 
@@ -257,7 +257,7 @@ const StoreTransferWizard: React.FC<StoreTransferWizardProps> = ({ isOpen, onClo
                     <div className="bg-white dark:bg-gray-900 p-4 rounded-xl border border-dashed border-gray-200 dark:border-gray-800 text-left space-y-2 max-h-40 overflow-y-auto">
                         <div className="flex justify-between items-center pb-2 border-b border-gray-50 dark:border-gray-800">
                             <span className="text-[8px] font-black text-gray-400 uppercase">Target Location</span>
-                            <span className="text-[10px] font-black text-emerald-600 uppercase">Retail Store Floor</span>
+                            <span className="text-[10px] font-black text-emerald-600 uppercase">Retail Store Stock</span>
                         </div>
                         {selectedItems.map((item, idx) => (
                           <div key={idx} className="flex justify-between items-center text-[9px] py-1 border-b border-gray-50 dark:border-gray-800 last:border-0">

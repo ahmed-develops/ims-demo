@@ -42,6 +42,14 @@ const Cart: React.FC<CartProps> = ({
   const [amountInput, setAmountInput] = useState('');
   const [discountInput, setDiscountInput] = useState('0');
 
+  // Reset local state when cart is cleared (e.g. after successful sale)
+  useEffect(() => {
+    if (items.length === 0) {
+      setAmountInput('');
+      setDiscountInput('0');
+    }
+  }, [items.length]);
+
   useEffect(() => {
     setDiscountInput(orderDiscount.toString());
   }, [orderDiscount]);
