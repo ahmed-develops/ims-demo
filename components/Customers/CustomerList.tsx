@@ -99,6 +99,7 @@ const CustomerList: React.FC<CustomerListProps> = ({
                         <tr>
                             <th className="p-4">Customer</th>
                             <th className="p-4">Contact</th>
+                            <th className="p-4">Email</th>
                             <th className="p-4 text-center">Loyalty</th>
                             <th className="p-4 text-right">Lifetime Spent</th>
                             <th className="p-4 text-right">Actions</th>
@@ -114,12 +115,15 @@ const CustomerList: React.FC<CustomerListProps> = ({
                                         </div>
                                         <div>
                                             <div className="font-bold text-gray-900 dark:text-white">{customer.name}</div>
-                                            <div className="text-[10px] text-gray-400">ID: {customer.id}</div>
+                                            <div className="text-[10px] text-gray-400">ID: {customer._id}</div>
                                         </div>
                                     </div>
                                 </td>
                                 <td className="p-4 text-sm text-gray-600 dark:text-gray-300 font-mono">
                                     {customer.phone}
+                                </td>
+                                <td className="p-4 text-sm text-gray-600 dark:text-gray-300 font-mono">
+                                    {customer.email}
                                 </td>
                                 <td className="p-4 text-center">
                                     <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 dark:bg-amber-900/20 text-amber-600">
@@ -127,7 +131,7 @@ const CustomerList: React.FC<CustomerListProps> = ({
                                     </span>
                                 </td>
                                 <td className="p-4 text-right font-bold text-gray-900 dark:text-white">
-                                    ₨ {customer.totalSpent.toFixed(2)}
+                                    ₨ {customer.totalSpent}
                                 </td>
                                 <td className="p-4 text-right">
                                     <div className="flex items-center justify-end gap-2">

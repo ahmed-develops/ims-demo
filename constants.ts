@@ -2,11 +2,11 @@
 import { Collection, Product, CashierUser, ShiftRecord } from './types';
 
 export const USERS: CashierUser[] = [
-  { id: 'u1', username: 'admin', password: '123', fullName: 'System Administrator', role: 'Admin' },
-  { id: 'u2', username: 'sarah', password: '123', fullName: 'Sarah Jenkins', role: 'Cashier' },
-  { id: 'u3', username: 'mike', password: '123', fullName: 'Mike Ross', role: 'Cashier' },
-  { id: 'u4', username: 'warehouse', password: '123', fullName: 'Dave Keeper', role: 'Warehouse' },
-  { id: 'u5', username: 'viewer', password: '123', fullName: 'John Auditor', role: 'Viewer' }
+  { _id: 'u1', username: 'admin', password: '123', name: 'System Administrator', role: 'Admin' },
+  { _id: 'u2', username: 'sarah', password: '123', name: 'Sarah Jenkins', role: 'Cashier' },
+  { _id: 'u3', username: 'mike', password: '123', name: 'Mike Ross', role: 'Cashier' },
+  { _id: 'u4', username: 'warehouse', password: '123', name: 'Dave Keeper', role: 'Warehouse Manager' },
+  { _id: 'u5', username: 'viewer', password: '123', name: 'John Auditor', role: 'Viewer' }
 ];
 
 const now = Date.now();
@@ -15,7 +15,7 @@ const nowIso = new Date().toISOString();
 export const SHIFT_HISTORY: ShiftRecord[] = [
   {
     id: 's1',
-    cashierName: 'Sarah Jenkins',
+    name: 'Sarah Jenkins',
     startTime: new Date(now - 14400000),
     endTime: new Date(now), 
     shift: 'Morning',
@@ -29,7 +29,7 @@ export const SHIFT_HISTORY: ShiftRecord[] = [
 
 export const PRODUCTS: Product[] = [
   {
-    id: 'NM-W2-001',
+    _id: 'NM-W2-001',
     name: 'Embroidered Velvet Shrug',
     category: Collection.WinterEditII,
     price: 8500,
@@ -44,7 +44,7 @@ export const PRODUCTS: Product[] = [
     ]
   },
   {
-    id: 'NM-WF-102',
+    _id: 'NM-WF-102',
     name: 'Pure Raw Silk Peshwas',
     category: Collection.WinterFormals,
     price: 24500,
@@ -58,7 +58,7 @@ export const PRODUCTS: Product[] = [
     ]
   },
   {
-    id: 'NM-L25-501',
+    _id: 'NM-L25-501',
     name: 'Digital Print Lawn Set',
     category: Collection.LawnVol2_2025,
     price: 6500,

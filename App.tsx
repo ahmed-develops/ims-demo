@@ -24,19 +24,19 @@ import AuditLogsView from './components/Admin/AuditLogsView';
 import BackupExportView from './components/Admin/BackupExportView';
 import ConfirmationModal from './components/UI/ConfirmationModal';
 import { ToastContainer } from './components/UI/Toast';
-import { ViewState, Product, ProductSize, CartItem, Transaction, Customer, SessionInfo, Collection, ShiftRecord, CashierUser, UserRole, TransactionType, AuditLog, StockMovement, StockMovementType, ToastMessage } from './types';
+import { ViewState, Product, ProductSize, CartItem, Transaction, Customer, SessionInfo, Collection, ShiftRecord, CashierUser, UserRole, TransactionType, AuditLog, StockMovement, StockMovementType, ToastMessage, Collections } from './types';
 import { PRODUCTS, SHIFT_HISTORY, USERS } from './constants';
 import { getShiftDetails } from './utils';
 import { LayoutDashboard, ShoppingCart, Archive, Users, Layers, TrendingUp, Truck, FileText, ClipboardList, Database, Barcode, History, RotateCcw } from 'lucide-react';
 
 const App: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [currentUser, setCurrentUser] = useState<string>('');
+  const [currentUser, setCurrentUser] = useState<CashierUser | null>(null);
   const [currentUserRole, setCurrentUserRole] = useState<UserRole | null>(null);
   const [sessionInfo, setSessionInfo] = useState<SessionInfo | null>(null);
   const [currentView, setCurrentView] = useState<ViewState>(ViewState.POS);
-  const [products, setProducts] = useState<Product[]>(PRODUCTS.map(p => ({ ...p, createdAt: new Date().toISOString() })));
-  const [users, setUsers] = useState<CashierUser[]>(USERS);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [users, setUsers] = useState<CashierUser[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
@@ -44,11 +44,7 @@ const App: React.FC = () => {
   const [stockMovements, setStockMovements] = useState<StockMovement[]>([]);
   const [shiftHistory, setShiftHistory] = useState<ShiftRecord[]>(SHIFT_HISTORY);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
-  const [collections, setCollections] = useState<string[]>([
-    Collection.WinterEditII,
-    Collection.WinterFormals,
-    Collection.LawnVol2_2025
-  ]);
+  const [collections, setCollections] = useState<Collections[]>([]);
   const [orderDiscount, setOrderDiscount] = useState<number>(0);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [showEndShiftModal, setShowEndShiftModal] = useState(false);
@@ -65,6 +61,12 @@ const App: React.FC = () => {
     if (isDarkMode) document.documentElement.classList.add('dark');
     else document.documentElement.classList.remove('dark');
   }, [isDarkMode]);
+
+  useEffect(() => {
+    fetchProducts();
+    fetchCollections();
+    fetchCustomers();
+  }, []);
 
   const toggleTheme = () => setIsDarkMode(!isDarkMode);
 
@@ -89,10 +91,10 @@ const App: React.FC = () => {
   }, [currentUser]);
 
   const logStockMovement = useCallback((
-    productId: string, 
-    productName: string, 
-    sizeInternal: string, 
-    type: StockMovementType, 
+    productId: string,
+    productName: string,
+    sizeInternal: string,
+    type: StockMovementType,
     qtyChange: number,
     newStore: number,
     newWhStock: number,
@@ -115,63 +117,104 @@ const App: React.FC = () => {
     setStockMovements(prev => [movement, ...prev]);
   }, [currentUser]);
 
+  const fetchCustomers = async () => {
+    const fetchCustomersApi = await fetch(process.env.CUSTOMER_BASE_URL, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' }
+    });
+
+    const fetchCustomersApiResponse = await fetchCustomersApi.json();
+
+    if (fetchCustomersApiResponse.OK) {
+      setCustomers(fetchCustomersApiResponse.DATA);
+    }
+  };
+
+  const fetchProducts = async () => {
+    const fetchProductsApi = await fetch(process.env.PRODUCT_BASE_URL, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' }
+    });
+
+    const fetchProductsApiResponse = await fetchProductsApi.json();
+
+    console.log(fetchProductsApiResponse.DATA)
+    if (fetchProductsApiResponse.OK) {
+      setProducts(fetchProductsApiResponse.DATA);
+    }
+  };
+
+  const fetchCollections = async () => {
+    const fetchCollectionsApi = await fetch(process.env.COLLECTION_BASE_URL, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' }
+    });
+
+    const fetchCollectionsApiResponse = await fetchCollectionsApi.json();
+
+    console.log(fetchCollectionsApiResponse.DATA)
+    if (fetchCollectionsApiResponse.OK) {
+      setCollections(fetchCollectionsApiResponse.DATA);
+    }
+  };
+
   const getNavItems = () => {
     const adminNavItems: NavItem[] = [
-        { id: ViewState.Reports, label: 'Analytics', icon: TrendingUp },
-        { id: ViewState.Inventory, label: 'Stock In', icon: Archive },
-        { id: ViewState.InventoryOut, label: 'Stock OUT', icon: Truck },
-        { id: ViewState.StockTrack, label: 'Stock Track', icon: History },
-        { id: ViewState.Barcodes, label: 'Barcodes', icon: Barcode },
-        { id: ViewState.StockReport, label: 'Stock Reports', icon: FileText },
-        { id: ViewState.Customers, label: 'Customers', icon: Users },
-        { id: ViewState.Collections, label: 'Collections', icon: Layers },
-        { id: ViewState.CashierManagement, label: 'Staff Mgmt', icon: Users },
-        { id: ViewState.Transactions, label: 'Transactions', icon: LayoutDashboard },
-        { id: ViewState.AuditLogs, label: 'Audit Logs', icon: ClipboardList },
-        { id: ViewState.Backup, label: 'Backup & Data', icon: Database },
-      ];
-    
-      const cashierNavItems: NavItem[] = [
-        { id: ViewState.POS, label: 'Point of Sale', icon: ShoppingCart },
-        { id: ViewState.Transactions, label: 'Transactions', icon: LayoutDashboard },
-      ];
-    
-      const warehouseNavItems: NavItem[] = [
-          { id: ViewState.Inventory, label: 'Stock In', icon: Archive },
-          { id: ViewState.InventoryOut, label: 'Stock OUT', icon: Truck },
-          { id: ViewState.StockTrack, label: 'Stock Track', icon: History },
-          { id: ViewState.Barcodes, label: 'Barcodes', icon: Barcode },
-          { id: ViewState.StockReport, label: 'Stock Report', icon: FileText },
-          { id: ViewState.Collections, label: 'Collections', icon: Layers },
-      ];
-    
-      const viewerNavItems: NavItem[] = [
-        { id: ViewState.Reports, label: 'Analytics', icon: TrendingUp },
-        { id: ViewState.StockReport, label: 'Stock Reports', icon: FileText },
-        { id: ViewState.StockTrack, label: 'Stock Track', icon: History },
-        { id: ViewState.Transactions, label: 'Transactions', icon: LayoutDashboard },
-        { id: ViewState.Customers, label: 'Customers', icon: Users },
-        { id: ViewState.AuditLogs, label: 'Audit Logs', icon: ClipboardList },
-      ];
+      { id: ViewState.Reports, label: 'Analytics', icon: TrendingUp },
+      { id: ViewState.Inventory, label: 'Stock In', icon: Archive },
+      { id: ViewState.InventoryOut, label: 'Stock OUT', icon: Truck },
+      { id: ViewState.StockTrack, label: 'Stock Track', icon: History },
+      { id: ViewState.Barcodes, label: 'Barcodes', icon: Barcode },
+      { id: ViewState.StockReport, label: 'Stock Reports', icon: FileText },
+      { id: ViewState.Customers, label: 'Customers', icon: Users },
+      { id: ViewState.Collections, label: 'Collections', icon: Layers },
+      { id: ViewState.CashierManagement, label: 'Staff Mgmt', icon: Users },
+      { id: ViewState.Transactions, label: 'Transactions', icon: LayoutDashboard },
+      { id: ViewState.AuditLogs, label: 'Audit Logs', icon: ClipboardList },
+      { id: ViewState.Backup, label: 'Backup & Data', icon: Database },
+    ];
 
-    switch(currentUserRole) {
-        case 'Admin': return adminNavItems;
-        case 'Cashier': return cashierNavItems;
-        case 'Warehouse': return warehouseNavItems;
-        case 'Viewer': return viewerNavItems;
-        default: return [];
+    const cashierNavItems: NavItem[] = [
+      { id: ViewState.POS, label: 'Point of Sale', icon: ShoppingCart },
+      { id: ViewState.Transactions, label: 'Transactions', icon: LayoutDashboard },
+    ];
+
+    const warehouseNavItems: NavItem[] = [
+      { id: ViewState.Inventory, label: 'Stock In', icon: Archive },
+      { id: ViewState.InventoryOut, label: 'Stock OUT', icon: Truck },
+      { id: ViewState.StockTrack, label: 'Stock Track', icon: History },
+      { id: ViewState.Barcodes, label: 'Barcodes', icon: Barcode },
+      { id: ViewState.StockReport, label: 'Stock Report', icon: FileText },
+      { id: ViewState.Collections, label: 'Collections', icon: Layers },
+    ];
+
+    const viewerNavItems: NavItem[] = [
+      { id: ViewState.Reports, label: 'Analytics', icon: TrendingUp },
+      { id: ViewState.StockReport, label: 'Stock Reports', icon: FileText },
+      { id: ViewState.StockTrack, label: 'Stock Track', icon: History },
+      { id: ViewState.Transactions, label: 'Transactions', icon: LayoutDashboard },
+      { id: ViewState.Customers, label: 'Customers', icon: Users },
+      { id: ViewState.AuditLogs, label: 'Audit Logs', icon: ClipboardList },
+    ];
+
+    switch (currentUserRole) {
+      case 'Admin': return adminNavItems;
+      case 'Cashier': return cashierNavItems;
+      case 'Warehouse': return warehouseNavItems;
+      case 'Viewer': return viewerNavItems;
+      default: return [];
     }
   };
 
   const handleLogin = (user: CashierUser) => {
-    setCurrentUser(user.fullName);
+    setCurrentUser(user.name);
     setCurrentUserRole(user.role);
     setIsAuthenticated(true);
     addAuditLog('Login', `User ${user.username} logged in as ${user.role}`);
-    addToast('success', 'Access Authorized', `Logged in as ${user.fullName}`);
-    
+    addToast('success', 'Access Authorized', `Logged in as ${user.name}`);
+
     if (user.role === 'Admin' || user.role === 'Viewer') setCurrentView(ViewState.Reports);
-    else if (user.role === 'Warehouse') setCurrentView(ViewState.Inventory);
+    else if (user.role === 'Warehouse Manager') setCurrentView(ViewState.Inventory);
     else setCurrentView(ViewState.POS);
   };
 
@@ -221,23 +264,23 @@ const App: React.FC = () => {
     if (!pendingCheckout || cart.length === 0 || !sessionInfo) return;
 
     const subtotal = cart.reduce((sum, item) => {
-        const price = item.selectedSize.price || item.price;
-        return sum + (price * (1 - (item.discount || 0) / 100)) * item.quantity;
+      const price = item.selectedSize.price || item.price;
+      return sum + (price * (1 - (item.discount || 0) / 100)) * item.quantity;
     }, 0);
     const total = subtotal * (1 - orderDiscount / 100);
 
     const cartSnapshot = [...cart];
     setProducts(prev => prev.map(p => {
-        const updatedSizes = p.sizes.map(s => {
-            const cartMatch = cartSnapshot.find(item => item.id === p.id && item.selectedSize.sizeInternal === s.sizeInternal);
-            if (cartMatch) {
-              const newStoreStock = Math.max(0, s.stock - cartMatch.quantity);
-              logStockMovement(p.id, p.name, s.sizeInternal, StockMovementType.Sale, -cartMatch.quantity, newStoreStock, s.warehouseStock, `POS Transaction`);
-              return { ...s, stock: newStoreStock };
-            }
-            return s;
-        });
-        return { ...p, sizes: updatedSizes };
+      const updatedSizes = p.sizes.map(s => {
+        const cartMatch = cartSnapshot.find(item => item.id === p.id && item.selectedSize.sizeInternal === s.sizeInternal);
+        if (cartMatch) {
+          const newStoreStock = Math.max(0, s.stock - cartMatch.quantity);
+          logStockMovement(p.id, p.name, s.sizeInternal, StockMovementType.Sale, -cartMatch.quantity, newStoreStock, s.warehouseStock, `POS Transaction`);
+          return { ...s, stock: newStoreStock };
+        }
+        return s;
+      });
+      return { ...p, sizes: updatedSizes };
     }));
 
     const txn: Transaction = {
@@ -278,34 +321,34 @@ const App: React.FC = () => {
     if (!txn) return;
 
     setProducts(prev => prev.map(p => {
-        const updatedSizes = p.sizes.map(s => {
-            const returnedItem = txn.items.find(item => item.id === p.id && item.selectedSize.sizeInternal === s.sizeInternal);
-            if (returnedItem) {
-                const newStoreStock = s.stock + returnedItem.quantity;
-                logStockMovement(p.id, p.name, s.sizeInternal, StockMovementType.Return, returnedItem.quantity, newStoreStock, s.warehouseStock, `Return from Txn #${txn.id}`);
-                return { ...s, stock: newStoreStock };
-            }
-            return s;
-        });
-        return { ...p, sizes: updatedSizes };
+      const updatedSizes = p.sizes.map(s => {
+        const returnedItem = txn.items.find(item => item.id === p.id && item.selectedSize.sizeInternal === s.sizeInternal);
+        if (returnedItem) {
+          const newStoreStock = s.stock + returnedItem.quantity;
+          logStockMovement(p.id, p.name, s.sizeInternal, StockMovementType.Return, returnedItem.quantity, newStoreStock, s.warehouseStock, `Return from Txn #${txn.id}`);
+          return { ...s, stock: newStoreStock };
+        }
+        return s;
+      });
+      return { ...p, sizes: updatedSizes };
     }));
 
     const returnTxn: Transaction = {
-        ...txn,
-        id: `RET-${Math.random().toString(36).substr(2, 5).toUpperCase()}`,
-        date: new Date(),
-        type: TransactionType.Return,
-        total: -txn.total,
-        amountPaid: -txn.amountPaid,
-        originalTransactionId: txn.id,
-        notes: `Customer return from #${txn.id}`
+      ...txn,
+      id: `RET-${Math.random().toString(36).substr(2, 5).toUpperCase()}`,
+      date: new Date(),
+      type: TransactionType.Return,
+      total: -txn.total,
+      amountPaid: -txn.amountPaid,
+      originalTransactionId: txn.id,
+      notes: `Customer return from #${txn.id}`
     };
 
     setTransactions(prev => {
-        const updated = prev.map(t => t.id === txn.id ? { ...t, isReturned: true } : t);
-        return [returnTxn, ...updated];
+      const updated = prev.map(t => t.id === txn.id ? { ...t, isReturned: true } : t);
+      return [returnTxn, ...updated];
     });
-    
+
     addAuditLog('Return', `Transaction #${txn.id} was returned.`);
     addToast('warning', 'Return Processed', `Stock levels adjusted for ${txn.id}`);
     setReturnTxnPending(null);
@@ -323,8 +366,8 @@ const App: React.FC = () => {
         const prod = products.find(p => p.id === productId);
         const sizeObj = prod?.sizes.find(s => s.sizeInternal === sizeInternal);
         if (sizeObj && newQty > sizeObj.stock) {
-           addToast('error', 'Inventory Limit', 'Cannot exceed available store stock');
-           return item;
+          addToast('error', 'Inventory Limit', 'Cannot exceed available store stock');
+          return item;
         }
         return { ...item, quantity: newQty };
       }
@@ -334,15 +377,15 @@ const App: React.FC = () => {
 
   const addToCart = (product: Product, selectedSize: ProductSize) => {
     if (selectedSize.stock <= 0) {
-        addToast('error', 'Out of Stock', `${product.name} (${selectedSize.size}) is not available`);
-        return;
+      addToast('error', 'Out of Stock', `${product.name} (${selectedSize.size}) is not available`);
+      return;
     }
     setCart(prev => {
       const existing = prev.find(item => item.id === product.id && item.selectedSize.sizeInternal === selectedSize.sizeInternal);
       if (existing) {
         if (existing.quantity >= selectedSize.stock) {
-            addToast('error', 'Inventory Limit', 'All available units are already in cart');
-            return prev;
+          addToast('error', 'Inventory Limit', 'All available units are already in cart');
+          return prev;
         }
         return prev.map(item => (item.id === product.id && item.selectedSize.sizeInternal === selectedSize.sizeInternal) ? { ...item, quantity: item.quantity + 1 } : item);
       }
@@ -381,63 +424,63 @@ const App: React.FC = () => {
       case ViewState.Inventory:
         return <InventoryList products={products} onAddProduct={p => { setProducts([p, ...products]); addAuditLog('Product Added', p.id); addToast('success', 'Article Created', `SKU ${p.id} initialized`); }} onEditProduct={p => setProducts(products.map(x => x.id === p.id ? p : x))} onDeleteProduct={id => setProducts(products.filter(x => x.id !== id))} lowStockThreshold={lowStockThreshold} onUpdateThreshold={setLowStockThreshold} collections={collections} currentUserRole={currentUserRole} />;
       case ViewState.InventoryOut:
-        return <InventoryOut products={products} transactions={transactions} onProcessOut={(type, items, details) => { 
-            setProducts(prev => prev.map(p => {
-                const productUpdates = items.filter(i => i.productId === p.id);
-                if (productUpdates.length > 0) {
-                    const updatedSizes = p.sizes.map(s => {
-                        const variantUpdate = productUpdates.find(u => u.sizeInternal === s.sizeInternal);
-                        if (variantUpdate) {
-                            const newWhStock = Math.max(0, s.warehouseStock - variantUpdate.quantity);
-                            const newStoreStock = type === TransactionType.Transfer ? s.stock + variantUpdate.quantity : s.stock;
-                            logStockMovement(p.id, p.name, s.sizeInternal, type === TransactionType.Transfer ? StockMovementType.Transfer : StockMovementType.Outward, -variantUpdate.quantity, newStoreStock, newWhStock, `Inventory Movement: ${type} - ${details.orderId || details.recipient}`);
-                            return { ...s, warehouseStock: newWhStock, stock: newStoreStock };
-                        }
-                        return s;
-                    });
-                    return { ...p, sizes: updatedSizes };
+        return <InventoryOut products={products} transactions={transactions} onProcessOut={(type, items, details) => {
+          setProducts(prev => prev.map(p => {
+            const productUpdates = items.filter(i => i.productId === p.id);
+            if (productUpdates.length > 0) {
+              const updatedSizes = p.sizes.map(s => {
+                const variantUpdate = productUpdates.find(u => u.sizeInternal === s.sizeInternal);
+                if (variantUpdate) {
+                  const newWhStock = Math.max(0, s.warehouseStock - variantUpdate.quantity);
+                  const newStoreStock = type === TransactionType.Transfer ? s.stock + variantUpdate.quantity : s.stock;
+                  logStockMovement(p.id, p.name, s.sizeInternal, type === TransactionType.Transfer ? StockMovementType.Transfer : StockMovementType.Outward, -variantUpdate.quantity, newStoreStock, newWhStock, `Inventory Movement: ${type} - ${details.orderId || details.recipient}`);
+                  return { ...s, warehouseStock: newWhStock, stock: newStoreStock };
                 }
-                return p;
-            }));
+                return s;
+              });
+              return { ...p, sizes: updatedSizes };
+            }
+            return p;
+          }));
 
-            const txItems: CartItem[] = items.map(ui => {
-                const prod = products.find(p => p.id === ui.productId)!;
-                const size = prod.sizes.find(s => s.sizeInternal === ui.sizeInternal)!;
-                return { ...prod, selectedSize: size, quantity: ui.quantity };
-            });
+          const txItems: CartItem[] = items.map(ui => {
+            const prod = products.find(p => p.id === ui.productId)!;
+            const size = prod.sizes.find(s => s.sizeInternal === ui.sizeInternal)!;
+            return { ...prod, selectedSize: size, quantity: ui.quantity };
+          });
 
-            const subtotal = txItems.reduce((acc, item) => acc + (item.price * item.quantity), 0);
-            const total = subtotal * (1 - (details.discount || 0) / 100);
+          const subtotal = txItems.reduce((acc, item) => acc + (item.price * item.quantity), 0);
+          const total = subtotal * (1 - (details.discount || 0) / 100);
 
-            let locDest = details.recipient || 'Logistics Partner';
-            if (type === TransactionType.Transfer) locDest = 'Retail Store';
+          let locDest = details.recipient || 'Logistics Partner';
+          if (type === TransactionType.Transfer) locDest = 'Retail Store';
 
-            const distTxn: Transaction = {
-                id: `MV-${Math.random().toString(36).substr(2, 5).toUpperCase()}`,
-                date: new Date(),
-                type,
-                items: txItems,
-                subtotal,
-                total,
-                paymentMethod: 'N/A',
-                amountPaid: total,
-                balance: 0,
-                isPartial: false,
-                shift: 'Morning',
-                businessDate: new Date().toISOString().split('T')[0],
-                cashierName: currentUser,
-                cashierRole: currentUserRole || 'Warehouse',
-                locationSource: 'Warehouse',
-                locationDestination: locDest,
-                recipientName: details.recipient,
-                externalOrderId: details.orderId,
-                orderDiscount: details.discount
-            };
+          const distTxn: Transaction = {
+            id: `MV-${Math.random().toString(36).substr(2, 5).toUpperCase()}`,
+            date: new Date(),
+            type,
+            items: txItems,
+            subtotal,
+            total,
+            paymentMethod: 'N/A',
+            amountPaid: total,
+            balance: 0,
+            isPartial: false,
+            shift: 'Morning',
+            businessDate: new Date().toISOString().split('T')[0],
+            cashierName: currentUser,
+            cashierRole: currentUserRole || 'Warehouse',
+            locationSource: 'Warehouse',
+            locationDestination: locDest,
+            recipientName: details.recipient,
+            externalOrderId: details.orderId,
+            orderDiscount: details.discount
+          };
 
-            setTransactions(prev => [distTxn, ...prev]);
-            setLastDistribution(distTxn); 
-            addAuditLog('Inventory Out', `Logistics Release: ${items.length} variants. ID: ${distTxn.id}`);
-            addToast('success', 'Logistics Finalized', `Gate pass ${distTxn.id} generated`);
+          setTransactions(prev => [distTxn, ...prev]);
+          setLastDistribution(distTxn);
+          addAuditLog('Inventory Out', `Logistics Release: ${items.length} variants. ID: ${distTxn.id}`);
+          addToast('success', 'Logistics Finalized', `Gate pass ${distTxn.id} generated`);
         }} />;
       case ViewState.StockTrack:
         return <StockTrackView movements={stockMovements} userRole={currentUserRole} />;
@@ -468,15 +511,15 @@ const App: React.FC = () => {
 
   return (
     <>
-      <Layout 
-        currentView={currentView} 
-        onChangeView={setCurrentView} 
-        isDarkMode={isDarkMode} 
-        onToggleTheme={toggleTheme} 
-        onEndShift={currentUserRole === 'Cashier' ? () => setShowEndShiftModal(true) : undefined} 
-        onLogout={currentUserRole !== 'Cashier' ? handleLogout : undefined} 
-        sessionInfo={sessionInfo} 
-        currentUser={currentUser} 
+      <Layout
+        currentView={currentView}
+        onChangeView={setCurrentView}
+        isDarkMode={isDarkMode}
+        onToggleTheme={toggleTheme}
+        onEndShift={currentUserRole === 'Cashier' ? () => setShowEndShiftModal(true) : undefined}
+        onLogout={currentUserRole !== 'Cashier' ? handleLogout : undefined}
+        sessionInfo={sessionInfo}
+        currentUser={currentUser}
         navItems={getNavItems()}
       >
         {renderContent()}

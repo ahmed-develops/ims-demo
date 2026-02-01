@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { User, Search, UserPlus, X, Phone, Check } from 'lucide-react';
+import { User, Search, UserPlus, X, Phone, Check, Mail } from 'lucide-react';
 import { Customer } from '../../types';
 
 interface CustomerSelectorProps {
@@ -9,42 +9,47 @@ interface CustomerSelectorProps {
   onAdd: (customer: Customer) => void;
 }
 
-const CustomerSelector: React.FC<CustomerSelectorProps> = ({ 
-  customers, 
-  selectedCustomer, 
-  onSelect, 
-  onAdd 
+const CustomerSelector: React.FC<CustomerSelectorProps> = ({
+  customers,
+  selectedCustomer,
+  onSelect,
+  onAdd
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [isAdding, setIsAdding] = useState(false);
-  const [newCustomer, setNewCustomer] = useState({ name: '', phone: '' });
+  const [newCustomer, setNewCustomer] = useState({ name: '', phone: '', email: '', loyaltyPoints: 0, totalSpent: 0 });
 
-  const filteredCustomers = customers.filter(c => 
-    c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+  const filteredCustomers = customers.filter(c =>
+    c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     c.phone.includes(searchTerm)
   );
 
-  const handleAdd = (e: React.FormEvent) => {
+  const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
-    const customer: Customer = {
-      id: Math.random().toString(36).substr(2, 9).toUpperCase(),
-      name: newCustomer.name,
-      phone: newCustomer.phone,
-      loyaltyPoints: 0,
-      totalSpent: 0
-    };
-    onAdd(customer);
-    onSelect(customer);
-    setIsAdding(false);
-    setIsOpen(false);
-    setNewCustomer({ name: '', phone: '' });
+
+    const addCustomerApi = await fetch(process.env.CUSTOMER_BASE_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newCustomer)
+    });
+
+    const addCustomerApiResponse = await addCustomerApi.json();
+
+    if (addCustomerApiResponse.OK) {
+      onAdd(addCustomerApiResponse.DATA);
+      onSelect(addCustomerApiResponse.DATA);
+      setIsAdding(false);
+      setIsOpen(false);
+    }
+
+    setNewCustomer({ name: '', phone: '', email: '' });
   };
 
   return (
     <div className="relative">
       {!selectedCustomer ? (
-        <button 
+        <button
           onClick={() => setIsOpen(true)}
           className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-sm font-medium w-full"
         >
@@ -60,6 +65,7 @@ const CustomerSelector: React.FC<CustomerSelectorProps> = ({
             <div className="min-w-0">
               <p className="text-xs font-bold text-indigo-700 dark:text-indigo-300 truncate">{selectedCustomer.name}</p>
               <p className="text-[10px] text-indigo-500 dark:text-indigo-400">{selectedCustomer.phone}</p>
+              <p className="text-[10px] text-indigo-500 dark:text-indigo-400">{selectedCustomer.email}</p>
             </div>
           </div>
           <button onClick={() => onSelect(null)} className="text-indigo-400 hover:text-indigo-600 shrink-0 p-1">
@@ -76,7 +82,7 @@ const CustomerSelector: React.FC<CustomerSelectorProps> = ({
               <div className="p-3">
                 <div className="relative mb-3">
                   <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                  <input 
+                  <input
                     autoFocus
                     type="text"
                     placeholder="Search by name or phone..."
@@ -85,7 +91,7 @@ const CustomerSelector: React.FC<CustomerSelectorProps> = ({
                     className="w-full pl-9 pr-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-100 dark:border-gray-600 rounded-lg text-xs outline-none focus:ring-1 focus:ring-indigo-500"
                   />
                 </div>
-                
+
                 <div className="max-h-48 overflow-y-auto space-y-1 mb-3">
                   {filteredCustomers.map(customer => (
                     <button
@@ -105,7 +111,7 @@ const CustomerSelector: React.FC<CustomerSelectorProps> = ({
                   )}
                 </div>
 
-                <button 
+                <button
                   onClick={() => setIsAdding(true)}
                   className="w-full flex items-center justify-center gap-2 py-2 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 text-xs font-bold rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors"
                 >
@@ -125,14 +131,27 @@ const CustomerSelector: React.FC<CustomerSelectorProps> = ({
                   <label className="block text-[10px] font-bold text-gray-500 mb-1">NAME</label>
                   <div className="relative">
                     <User size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
-                    <input 
+                    <input
                       required
                       autoFocus
                       type="text"
                       value={newCustomer.name}
-                      onChange={(e) => setNewCustomer({...newCustomer, name: e.target.value})}
+                      onChange={(e) => setNewCustomer({ ...newCustomer, name: e.target.value })}
                       className="w-full pl-8 pr-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-100 dark:border-gray-600 rounded-lg text-xs outline-none focus:ring-1 focus:ring-indigo-500"
                       placeholder="Customer Name"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-500 mb-1">EMAIL</label>
+                  <div className="relative">
+                    <Mail size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <input
+                      type="email"
+                      value={newCustomer.email}
+                      onChange={(e) => setNewCustomer({ ...newCustomer, email: e.target.value })}
+                      className="w-full pl-8 pr-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-100 dark:border-gray-600 rounded-lg text-xs outline-none focus:ring-1 focus:ring-indigo-500"
+                      placeholder="customer@niamia.com"
                     />
                   </div>
                 </div>
@@ -140,17 +159,17 @@ const CustomerSelector: React.FC<CustomerSelectorProps> = ({
                   <label className="block text-[10px] font-bold text-gray-500 mb-1">PHONE NUMBER</label>
                   <div className="relative">
                     <Phone size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
-                    <input 
+                    <input
                       required
                       type="tel"
                       value={newCustomer.phone}
-                      onChange={(e) => setNewCustomer({...newCustomer, phone: e.target.value})}
+                      onChange={(e) => setNewCustomer({ ...newCustomer, phone: e.target.value })}
                       className="w-full pl-8 pr-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-100 dark:border-gray-600 rounded-lg text-xs outline-none focus:ring-1 focus:ring-indigo-500"
                       placeholder="03xx-xxxxxxx"
                     />
                   </div>
                 </div>
-                <button 
+                <button
                   type="submit"
                   className="w-full py-2 bg-indigo-600 text-white text-xs font-bold rounded-lg hover:bg-indigo-700 transition-colors mt-2 shadow-md shadow-indigo-200 dark:shadow-none"
                 >
