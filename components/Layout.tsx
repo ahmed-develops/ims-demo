@@ -73,7 +73,7 @@ const Layout: React.FC<LayoutProps> = ({
           <div className="mx-4 mt-4 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl border border-gray-100 dark:border-gray-700 space-y-3">
              <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400">
                 <UserCircle size={16} />
-                <span className="text-xs font-black truncate uppercase tracking-tight">{currentUser}</span>
+                <span className="text-xs font-black truncate uppercase tracking-tight">{sessionInfo.cashierName}</span>
              </div>
              <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 text-[10px] text-gray-500 dark:text-gray-400 font-bold">

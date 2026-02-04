@@ -15,33 +15,33 @@ const Login: React.FC<LoginProps> = ({ users, onLogin }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!username.trim() || !password.trim()) return;
     
     setIsLoading(true);
     setError('');
 
-    const userAuthApi = await fetch(process.env.AUTH_BASE_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password, role: selectedRole })
-    });
+    setTimeout(() => {
+        const user = users.find(u => 
+            u.username.toLowerCase() === username.toLowerCase() && 
+            u.password === password &&
+            u.role === selectedRole
+        );
 
-    const userAuthApiResponse = await userAuthApi.json();
-
-    if (userAuthApiResponse.OK) {
-        onLogin(userAuthApiResponse.DATA);
-    } else {
-        setError(userAuthApiResponse.MSG);
-        setIsLoading(false);
-    }
+        if (user) {
+            onLogin(user);
+        } else {
+            setError(`Invalid credentials for ${selectedRole} portal`);
+            setIsLoading(false);
+        }
+    }, 800);
   };
 
   const getRoleIcon = (role: UserRole) => {
     switch(role) {
         case 'Admin': return <ShieldCheck size={14} className="shrink-0" />;
-        case 'Warehouse Manager': return <Package size={14} className="shrink-0" />;
+        case 'Warehouse': return <Package size={14} className="shrink-0" />;
         case 'Viewer': return <Eye size={14} className="shrink-0" />;
         default: return <UserCheck size={14} className="shrink-0" />;
     }
@@ -64,7 +64,7 @@ const Login: React.FC<LoginProps> = ({ users, onLogin }) => {
         <div className="p-8">
             {/* Role Tabs - Optimized for narrower container */}
             <div className="flex p-1 bg-gray-100 dark:bg-gray-700/50 rounded-xl mb-8 gap-1">
-                {(['Cashier', 'Admin', 'WH Manager', 'Viewer'] as UserRole[]).map((role) => (
+                {(['Cashier', 'Admin', 'Warehouse', 'Viewer'] as UserRole[]).map((role) => (
                     <button
                         key={role}
                         type="button"

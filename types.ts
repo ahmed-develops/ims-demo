@@ -6,7 +6,7 @@ export enum Collection {
   LawnVol2_2025 = 'Lawn Vol 2 2025'
 }
 
-export type UserRole = 'Admin' | 'Cashier' | 'Warehouse Manager' | 'Viewer';
+export type UserRole = 'Admin' | 'Cashier' | 'Warehouse' | 'Viewer';
 
 export interface ProductSize {
   size: string;         // e.g. "XS"
@@ -18,8 +18,7 @@ export interface ProductSize {
 }
 
 export interface Product {
-  _id: string;           // Internal Article Reference / Style Code
-  id: string;
+  id: string;           // Internal Article Reference / Style Code
   name: string;
   category: string;
   price: number; 
@@ -40,26 +39,19 @@ export interface CartItem extends Product {
 }
 
 export interface Customer {
-  _id: string;
+  id: string;
   name: string;
   phone: string;
-  email: string;
   loyaltyPoints: number;
   totalSpent: number;
 }
 
 export interface CashierUser {
-  _id: string;
+  id: string;
   username: string;
   password: string;
-  name: string;
+  fullName: string;
   role: UserRole;
-}
-
-export interface Collections {
-  _id: string;
-  id: string;
-  name: string;
 }
 
 export enum TransactionType {
@@ -136,12 +128,12 @@ export interface SessionInfo {
   startTime: Date;
   shift: 'Morning' | 'Night';
   businessDate: Date;
-  name: string;
+  cashierName: string;
 }
 
 export interface ShiftRecord {
   id: string;
-  name: string;
+  cashierName: string;
   startTime: Date;
   endTime: Date;
   shift: 'Morning' | 'Night';
